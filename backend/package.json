@@ -12,7 +12,8 @@
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "lint": "eslint src/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "seed:tasks": "tsx scripts/seed-test-tasks.ts"
   },
   "dependencies": {
     "@hilt-review/shared": "*",
