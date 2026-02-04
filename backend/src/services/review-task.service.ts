@@ -1,8 +1,8 @@
 import { eq, and, desc } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { reviewTasks, sources } from '../db/schema.js';
-import { NotFoundError } from '../domain/errors.js';
-import type { CreateReviewTaskInput } from '../domain/schemas.js';
+import { NotFoundError, InvalidStateError } from '../domain/errors.js';
+import type { CreateReviewTaskInput, PatchBlocksInput } from '../domain/schemas.js';
 import type { ReviewTask, ReviewTaskListItem, ArtifactBlock, ServiceIdentifier, ActionIdentifier, InteractionSchema, ExecutionIntent, ReviewDecision, DecisionDiff } from '@hilt-review/shared';
 
 export class ReviewTaskService {
@@ -117,6 +117,38 @@ export class ReviewTaskService {
     const total = items.length;
 
     return { items, total, nextCursor };
+  }
+
+  async updateBlocks(id: string, input: PatchBlocksInput): Promise<ReviewTask> {
+    // Get task and verify it exists and is in PENDING status
+    const [result] = await db.select({
+      task: reviewTasks,
+      sourceName: sources.name,
+    })
+      .from(reviewTasks)
+      .leftJoin(sources, eq(reviewTasks.sourceId, sources.id))
+      .where(eq(reviewTasks.id, id));
+
+    if (!result) {
+      throw new NotFoundError('ReviewTask', id);
+    }
+
+    if (result.task.status !== 'PENDING') {
+      throw new InvalidStateError('Cannot modify blocks after decision', {
+        current_status: result.task.status,
+      });
+    }
+
+    // Update working blocks
+    const [updated] = await db.update(reviewTasks)
+      .set({
+        blocksWorking: input.blocks_working,
+        updatedAt: new Date(),
+      })
+      .where(eq(reviewTasks.id, id))
+      .returning();
+
+    return this.toReviewTask(updated, result.sourceName || 'Unknown');
   }
 
   private toReviewTask(row: typeof reviewTasks.$inferSelect, sourceName: string): ReviewTask {
