@@ -1,5 +1,5 @@
 import { createTwoFilesPatch } from 'diff';
-import * as jsonPatch from 'fast-json-patch';
+import jsonPatch from 'fast-json-patch';
 import type { ArtifactBlock, DecisionDiff, TextDiff, JsonPatch } from '@hilt-review/shared';
 
 export class DiffService {
