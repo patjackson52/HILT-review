@@ -31,6 +31,7 @@ HILT-Review enables safe, asynchronous human approval of AI-proposed actions bef
 | [Product Requirements](./hilt_review_prd.md) | MVP goals, lifecycle, core concepts |
 | [OpenAPI Specification](./openapi/hilt-review-openapi.yaml) | Complete API contract |
 | [Frontend Spec](./hilt_review_frontend_spec.md) | UI components and UX flows |
+| [UI Detailed Spec](./docs/ui-detailed-spec.md) | Wireframes, components, state management |
 | [Database Schema](./hilt_review_postgres_schema.md) | PostgreSQL tables, indexes, triggers |
 | [Upstream Integration](./hilt_review_upstream_agent_integration.md) | Guide for AI agents submitting tasks |
 | [Downstream Integration](./hilt_review_downstream_executor_integration.md) | Guide for executors receiving decisions |
