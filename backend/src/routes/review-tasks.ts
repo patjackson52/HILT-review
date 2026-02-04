@@ -24,6 +24,9 @@ export async function reviewTasksRoutes(app: FastifyInstance) {
     const result = await reviewTaskService.list({
       sourceId: query.source_id,
       status: query.status,
+      riskLevel: query.risk_level,
+      serviceId: query.service_id,
+      actionType: query.action_type,
       limit: query.limit,
       cursor: query.cursor,
     });

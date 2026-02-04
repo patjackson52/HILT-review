@@ -61,10 +61,13 @@ export class ReviewTaskService {
   async list(options: {
     sourceId?: string;
     status?: string;
+    riskLevel?: string;
+    serviceId?: string;
+    actionType?: string;
     limit?: number;
     cursor?: string;
   } = {}): Promise<{ items: ReviewTaskListItem[]; total: number; nextCursor?: string }> {
-    const { sourceId, status, limit = 50, cursor } = options;
+    const { sourceId, status, riskLevel, serviceId, actionType, limit = 50, cursor } = options;
 
     let query = db.select({
       task: reviewTasks,
@@ -82,12 +85,29 @@ export class ReviewTaskService {
     if (status) {
       conditions.push(eq(reviewTasks.status, status as 'PENDING' | 'APPROVED' | 'DENIED' | 'DISPATCHED' | 'ARCHIVED'));
     }
+    if (riskLevel) {
+      conditions.push(eq(reviewTasks.riskLevel, riskLevel as 'low' | 'medium' | 'high' | 'critical'));
+    }
 
     if (conditions.length > 0) {
       query = query.where(and(...conditions)) as typeof query;
     }
 
-    const results = await query;
+    let results = await query;
+
+    // Filter by service_id and action_type in memory (JSONB columns)
+    if (serviceId) {
+      results = results.filter(r => {
+        const service = r.task.service as ServiceIdentifier;
+        return service?.id === serviceId;
+      });
+    }
+    if (actionType) {
+      results = results.filter(r => {
+        const action = r.task.action as ActionIdentifier;
+        return action?.type === actionType;
+      });
+    }
 
     const hasMore = results.length > limit;
     const items = results.slice(0, limit).map(r => this.toReviewTaskListItem(r.task, r.sourceName || 'Unknown'));
