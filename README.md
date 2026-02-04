@@ -40,6 +40,7 @@ HILT-Review enables safe, asynchronous human approval of AI-proposed actions bef
 | [Backend Spec](./docs/backend-spec.md) | Node.js + Fastify + TypeScript architecture |
 | [Deployment Guide](./docs/deployment-guide.md) | Deploy to Vercel + Railway + Neon (free tier) |
 | [Testing Strategy](./docs/testing-strategy.md) | Unit tests, integration tests, test data, dev workflows |
+| [MCP Integration](./docs/mcp-integration.md) | Model Context Protocol for AI agent integration |
 
 ## Architecture
 
