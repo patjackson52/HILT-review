@@ -1,0 +1,204 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 3rem;
+  color: var(--color-text-muted);
+}
+
+.error {
+  color: var(--color-danger);
+}
+
+.header {
+  background: var(--color-bg-card);
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow);
+}
+
+.headerTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.backButton {
+  background: transparent;
+  color: var(--color-text-muted);
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+}
+
+.backButton:hover {
+  color: var(--color-primary);
+}
+
+.riskBadge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.riskBadge.low {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--risk-low);
+}
+
+.riskBadge.medium {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--risk-medium);
+}
+
+.riskBadge.high {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--risk-high);
+}
+
+.riskBadge.critical {
+  background: rgba(124, 45, 18, 0.1);
+  color: var(--risk-critical);
+}
+
+.taskInfo {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.service {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.action {
+  color: var(--color-text-muted);
+}
+
+.title {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.warning {
+  color: var(--color-danger);
+  font-size: 0.875rem;
+  padding: 0.75rem;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: var(--radius);
+  margin-top: 1rem;
+}
+
+.content, .intent {
+  background: var(--color-bg-card);
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow);
+}
+
+.sectionTitle {
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  color: var(--color-text-muted);
+}
+
+.block {
+  margin-bottom: 1rem;
+}
+
+.block:last-child {
+  margin-bottom: 0;
+}
+
+.blockLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.blockContent {
+  background: var(--color-bg);
+  padding: 1rem;
+  border-radius: var(--radius);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.intentDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.intentAction, .intentTarget {
+  margin: 0;
+}
+
+.intentWarning {
+  color: var(--color-warning);
+  font-size: 0.875rem;
+  padding: 0.75rem;
+  background: rgba(245, 158, 11, 0.1);
+  border-radius: var(--radius);
+  margin-top: 0.5rem;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  position: sticky;
+  bottom: 1.5rem;
+  background: var(--color-bg-card);
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+.approveButton, .denyButton {
+  padding: 0.75rem 2rem;
+  border-radius: var(--radius);
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.approveButton {
+  background: var(--color-success);
+  color: white;
+}
+
+.approveButton:hover:not(:disabled) {
+  background: #16a34a;
+}
+
+.denyButton {
+  background: transparent;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+}
+
+.denyButton:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.approveButton:disabled, .denyButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
