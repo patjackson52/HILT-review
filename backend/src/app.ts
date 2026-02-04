@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import { config } from './config/index.js';
 import { errorHandler } from './middleware/error-handler.js';
+import { registerRoutes } from './routes/index.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -26,6 +27,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.get('/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };
   });
+
+  // Register API routes
+  await registerRoutes(app);
 
   return app;
 }
