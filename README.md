@@ -36,6 +36,7 @@ HILT-Review enables safe, asynchronous human approval of AI-proposed actions bef
 | [Downstream Integration](./hilt_review_downstream_executor_integration.md) | Guide for executors receiving decisions |
 | [Repository Structure](./hilt_review_repo_structure.md) | Recommended project layout |
 | [Authentication](./hilt_review_authentication.md) | OAuth, API keys, and security |
+| [Deployment Guide](./docs/deployment-guide.md) | Deploy to Vercel + Railway + Neon (free tier) |
 
 ## Architecture
 
