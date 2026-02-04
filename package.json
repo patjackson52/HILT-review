@@ -1,0 +1,21 @@
+{
+  "name": "hilt-review",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "db:migrate": "npm run db:migrate --workspace=backend",
+    "db:generate": "npm run db:generate --workspace=backend",
+    "generate:types": "./scripts/generate-types.sh"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  }
+}
