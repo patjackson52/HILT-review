@@ -1,13 +1,37 @@
 openapi: 3.1.0
 info:
   title: HILT-Review API
-  version: 1.1.0
+  version: 1.2.0
   description: >
     Human-in-the-loop review gatekeeper for async headless agent pipelines.
     Agents propose actions as Review Tasks. Humans edit/approve/deny.
     HILT-Review emits decisions to downstream executors via per-source webhooks
     and/or a pull API. Delivery is at-least-once; consumers must dedupe using
     event IDs and idempotency keys.
+
+
+    ## Authentication
+
+    - **Machine clients** (agents, executors): Use API key via `X-API-Key` header
+    - **Human reviewers**: Authenticate via Google OAuth 2.0 (session-based)
+
+
+    ## Rate Limiting
+
+    All endpoints are rate-limited. Limits are per API key or per session.
+    When rate limited, the API returns `429 Too Many Requests`.
+
+    | Endpoint Category | Limit |
+    |-------------------|-------|
+    | Task Creation | 100 requests/minute |
+    | Task Reads | 1000 requests/minute |
+    | Decision Events | 500 requests/minute |
+    | Source Management | 50 requests/minute |
+
+    Rate limit headers are included in all responses:
+    - `X-RateLimit-Limit`: Maximum requests allowed in window
+    - `X-RateLimit-Remaining`: Requests remaining in current window
+    - `X-RateLimit-Reset`: Unix timestamp when window resets
 
 servers:
   - url: https://api.hilt-review.example.com
@@ -37,7 +61,221 @@ components:
       schema:
         type: string
 
+    RateLimitLimit:
+      description: Maximum number of requests allowed in the current window.
+      schema:
+        type: integer
+        example: 100
+
+    RateLimitRemaining:
+      description: Number of requests remaining in the current window.
+      schema:
+        type: integer
+        example: 95
+
+    RateLimitReset:
+      description: Unix timestamp (seconds) when the rate limit window resets.
+      schema:
+        type: integer
+        example: 1699900060
+
+  responses:
+    BadRequest:
+      description: Invalid request - malformed JSON, missing required fields, or validation errors.
+      headers:
+        X-RateLimit-Limit:
+          $ref: "#/components/headers/RateLimitLimit"
+        X-RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimitRemaining"
+        X-RateLimit-Reset:
+          $ref: "#/components/headers/RateLimitReset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "VALIDATION_ERROR"
+              message: "Request validation failed"
+              details:
+                fields:
+                  - field: "blocks[0].id"
+                    message: "Block ID is required"
+
+    Unauthorized:
+      description: Missing or invalid authentication credentials.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "UNAUTHORIZED"
+              message: "Invalid or missing API key"
+
+    Forbidden:
+      description: Authenticated but not authorized for this operation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "FORBIDDEN"
+              message: "API key does not have access to this source"
+
+    NotFound:
+      description: Requested resource not found.
+      headers:
+        X-RateLimit-Limit:
+          $ref: "#/components/headers/RateLimitLimit"
+        X-RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimitRemaining"
+        X-RateLimit-Reset:
+          $ref: "#/components/headers/RateLimitReset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "NOT_FOUND"
+              message: "Review task not found"
+              details:
+                resource_type: "review_task"
+                resource_id: "550e8400-e29b-41d4-a716-446655440000"
+
+    Conflict:
+      description: Request conflicts with current state (idempotency mismatch, invalid state transition).
+      headers:
+        X-RateLimit-Limit:
+          $ref: "#/components/headers/RateLimitLimit"
+        X-RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimitRemaining"
+        X-RateLimit-Reset:
+          $ref: "#/components/headers/RateLimitReset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "IDEMPOTENCY_MISMATCH"
+              message: "Idempotency key was used with different request body"
+
+    PreconditionFailed:
+      description: Precondition failed (ETag mismatch for optimistic concurrency).
+      headers:
+        X-RateLimit-Limit:
+          $ref: "#/components/headers/RateLimitLimit"
+        X-RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimitRemaining"
+        X-RateLimit-Reset:
+          $ref: "#/components/headers/RateLimitReset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "PRECONDITION_FAILED"
+              message: "Resource was modified by another request"
+              details:
+                current_etag: "abc123"
+
+    UnprocessableEntity:
+      description: Request is well-formed but cannot be processed (business logic error).
+      headers:
+        X-RateLimit-Limit:
+          $ref: "#/components/headers/RateLimitLimit"
+        X-RateLimit-Remaining:
+          $ref: "#/components/headers/RateLimitRemaining"
+        X-RateLimit-Reset:
+          $ref: "#/components/headers/RateLimitReset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "INVALID_STATE_TRANSITION"
+              message: "Cannot submit decision for task in ARCHIVED status"
+              details:
+                current_status: "ARCHIVED"
+                allowed_statuses: ["PENDING"]
+
+    TooManyRequests:
+      description: Rate limit exceeded. Retry after the window resets.
+      headers:
+        X-RateLimit-Limit:
+          $ref: "#/components/headers/RateLimitLimit"
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+            example: 0
+        X-RateLimit-Reset:
+          $ref: "#/components/headers/RateLimitReset"
+        Retry-After:
+          description: Seconds until the rate limit resets.
+          schema:
+            type: integer
+            example: 30
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "RATE_LIMITED"
+              message: "Too many requests. Retry after 30 seconds."
+              details:
+                retry_after_seconds: 30
+
+    InternalServerError:
+      description: Unexpected server error. Safe to retry with exponential backoff.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "INTERNAL_ERROR"
+              message: "An unexpected error occurred"
+              request_id: "req_abc123xyz"
+
   schemas:
+    # -------- Error Response --------
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code.
+              enum:
+                - VALIDATION_ERROR
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - NOT_FOUND
+                - IDEMPOTENCY_MISMATCH
+                - PRECONDITION_FAILED
+                - INVALID_STATE_TRANSITION
+                - RATE_LIMITED
+                - INTERNAL_ERROR
+            message:
+              type: string
+              description: Human-readable error message.
+            details:
+              type: object
+              description: Additional error context (varies by error type).
+            request_id:
+              type: string
+              description: Request ID for debugging (included on server errors).
+
     # -------- Common Types --------
     UUID:
       type: string
@@ -469,10 +707,29 @@ paths:
       responses:
         "201":
           description: Review task created
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/RateLimitLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/RateLimitRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/RateLimitReset"
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewTask"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
     get:
       summary: List review tasks
