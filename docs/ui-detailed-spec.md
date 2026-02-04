@@ -1103,17 +1103,19 @@ Desktop:  > 1024px
 
 ## 11. Data Model Validation Checklist
 
-Based on this UI spec, verify the data model supports:
+Based on this UI spec, the data model has been updated (OpenAPI v1.3.0):
 
 | UI Requirement | Data Model Field | Status |
 |----------------|-----------------|--------|
-| Show source name in list | `source_name` on task list response | ⚠️ Need to add |
-| Show task summary | `metadata.summary` or derive from blocks | ⚠️ Need convention |
-| Show total count for pagination | `total_count` in list response | ⚠️ Need to add |
-| Show execution intent description | `execution_intent.display` object | ⚠️ Need convention |
+| Show source name in list | `source_name` on ReviewTask and ReviewTaskListItem | ✅ Added |
+| Show task summary | `summary` field on ReviewTask and ReviewTaskListItem | ✅ Added |
+| Show total count for pagination | `total_count` in list response | ✅ Added |
+| Show execution intent description | `execution_intent.display` object with `action_type`, `target`, `warning` | ✅ Added |
 | Track who made decision | `decision.decided_by` | ✅ Exists |
-| Show modification indicator | Compare `blocks_original` vs `blocks_working` | ✅ Exists |
-| Quick deny reasons | Could be in `interaction_schema.deny_reasons` | ⚠️ Consider adding |
+| Show modification indicator | `has_changes` on ReviewTaskListItem | ✅ Added |
+| Quick deny reasons | `interaction_schema.deny_reasons[]` array | ✅ Added |
+| External review URL | `interaction_schema.external_url` | ✅ Added |
+| Block count in list | `block_count` on ReviewTaskListItem | ✅ Added |
 
 ---
 
