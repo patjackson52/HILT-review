@@ -16,16 +16,30 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Development mode: auto-login with mock user
+const DEV_MODE = import.meta.env.DEV;
+const MOCK_USER: User = {
+  id: 'dev-user',
+  email: 'dev@example.com',
+  name: 'Developer',
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is authenticated
     checkAuth();
   }, []);
 
   async function checkAuth() {
+    // In dev mode, auto-login with mock user
+    if (DEV_MODE) {
+      setUser(MOCK_USER);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/v1/auth/me');
       if (response.ok) {
@@ -40,11 +54,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function login() {
+    if (DEV_MODE) {
+      setUser(MOCK_USER);
+      return;
+    }
     // Redirect to OAuth login
     window.location.href = '/api/v1/auth/google';
   }
 
   async function logout() {
+    if (DEV_MODE) {
+      setUser(null);
+      return;
+    }
     try {
       await fetch('/api/v1/auth/logout', { method: 'POST' });
     } finally {
