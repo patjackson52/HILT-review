@@ -864,7 +864,381 @@ The MCP server runs **client-side** (with the agent), not as a hosted service:
 
 ---
 
-## 9. Example Agent Workflow
+## 9. MCP Server Deployment Options & Costs
+
+There are **three deployment strategies** for the MCP server, each with different cost and operational characteristics.
+
+### Option A: Client-Side MCP (stdio) — Recommended for Most Users
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     Agent's Local Machine                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌──────────────┐     stdio      ┌──────────────────┐                   │
+│  │ Claude Code  │ ◀────────────▶ │ @hilt-review/    │                   │
+│  │ / Desktop    │                │ mcp-server       │                   │
+│  └──────────────┘                │ (npx process)    │                   │
+│                                  └────────┬─────────┘                   │
+│                                           │                              │
+└───────────────────────────────────────────┼──────────────────────────────┘
+                                            │ HTTPS
+                                            ▼
+                              ┌──────────────────────────┐
+                              │  HILT-Review REST API    │
+                              │  (existing deployment)   │
+                              └──────────────────────────┘
+```
+
+| Aspect | Details |
+|--------|---------|
+| **Additional Hosting Cost** | **$0** |
+| **Uptime** | Depends on agent's machine |
+| **Scaling** | Each agent runs own instance |
+| **Setup** | User adds to MCP config |
+| **Maintenance** | NPM package updates |
+
+**How it works:**
+- Agent host (Claude Desktop, Cursor) spawns MCP server as child process
+- Communication via stdio (stdin/stdout)
+- MCP server makes HTTPS calls to HILT-Review API
+- No server to host or maintain
+
+**Best for:** Individual developers, small teams, Claude Desktop/Cursor users
+
+---
+
+### Option B: Integrated MCP Endpoints (HTTP/SSE) — Recommended for Low-Cost Hosting
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     Existing HILT-Review Backend                         │
+│                        (Railway / Render)                                │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │                    Fastify Backend                               │    │
+│  │                                                                  │    │
+│  │  /review-tasks      ← REST API (existing)                       │    │
+│  │  /sources           ← REST API (existing)                       │    │
+│  │  /mcp/sse           ← MCP HTTP/SSE endpoint (new)               │    │
+│  │  /mcp/messages      ← MCP message handler (new)                 │    │
+│  │                                                                  │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+| Aspect | Details |
+|--------|---------|
+| **Additional Hosting Cost** | **$0** (uses existing backend) |
+| **Uptime** | Same as REST API (~99.9% on Railway/Render) |
+| **Scaling** | Scales with existing backend |
+| **Setup** | Point MCP client to hosted URL |
+| **Maintenance** | Part of normal backend deploys |
+
+**Implementation:**
+
+```typescript
+// backend/src/routes/mcp.ts
+import { FastifyInstance } from 'fastify';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+
+export async function mcpRoutes(app: FastifyInstance) {
+  const mcpServer = createMcpServer(app);
+
+  // SSE endpoint for MCP clients
+  app.get('/mcp/sse', async (request, reply) => {
+    // Authenticate via API key in query or header
+    const apiKey = request.headers['x-api-key'] as string;
+    const source = await authenticateApiKey(apiKey);
+    if (!source) {
+      return reply.code(401).send({ error: 'Unauthorized' });
+    }
+
+    reply.raw.setHeader('Content-Type', 'text/event-stream');
+    reply.raw.setHeader('Cache-Control', 'no-cache');
+    reply.raw.setHeader('Connection', 'keep-alive');
+
+    // Handle MCP protocol over SSE
+    const transport = new SSEServerTransport('/mcp/messages', reply.raw);
+    await mcpServer.connect(transport);
+  });
+
+  // Message endpoint for MCP requests
+  app.post('/mcp/messages', async (request, reply) => {
+    // Route MCP messages to server
+    return mcpServer.handleMessage(request.body);
+  });
+}
+```
+
+**Agent configuration:**
+
+```json
+{
+  "mcpServers": {
+    "hilt-review": {
+      "transport": "sse",
+      "url": "https://api.hilt-review.com/mcp/sse",
+      "headers": {
+        "X-API-Key": "hilt_live_key_xxx"
+      }
+    }
+  }
+}
+```
+
+**Best for:** Teams wanting centralized MCP without additional infrastructure
+
+---
+
+### Option C: Dedicated MCP Service — For High-Volume / Enterprise
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Dedicated MCP Service                             │
+│                     (Separate Railway/Render app)                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │              MCP Gateway Service                                 │    │
+│  │                                                                  │    │
+│  │  - WebSocket support for persistent connections                 │    │
+│  │  - Connection pooling to backend API                            │    │
+│  │  - Per-agent rate limiting                                      │    │
+│  │  - Metrics and observability                                    │    │
+│  │  - Horizontal scaling                                           │    │
+│  │                                                                  │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+              │
+              │ Internal network
+              ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     HILT-Review Backend                                  │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+| Aspect | Details |
+|--------|---------|
+| **Additional Hosting Cost** | **$5-20/month** (Railway/Render instance) |
+| **Uptime** | ~99.9% (same as platform) |
+| **Scaling** | Independent scaling from API |
+| **Setup** | Deploy separate service |
+| **Maintenance** | Additional deployment pipeline |
+
+**Best for:** High-volume agent traffic, enterprise deployments, strict isolation requirements
+
+---
+
+### Cost Comparison
+
+| Option | Hosting Cost | Use Case | Uptime |
+|--------|-------------|----------|--------|
+| **A: Client-side (stdio)** | $0 | Individual devs, Claude Desktop | Agent-dependent |
+| **B: Integrated (HTTP/SSE)** | $0 | Teams, centralized | ~99.9% |
+| **C: Dedicated service** | $5-20/mo | Enterprise, high-volume | ~99.9% |
+
+### Traffic Estimates (Option B - Integrated)
+
+Option B adds minimal load to the existing backend:
+
+| Traffic Level | Agents | Tasks/day | API Calls/day | Backend Impact |
+|---------------|--------|-----------|---------------|----------------|
+| Low | 1-5 | 10-50 | ~500 | Negligible |
+| Medium | 5-20 | 50-500 | ~5,000 | <5% capacity |
+| High | 20-100 | 500-5,000 | ~50,000 | 10-20% capacity |
+
+**Recommendation:** Start with **Option B** (integrated). It's free and sufficient for most use cases. Only move to Option C if you have 100+ concurrent agents or need dedicated scaling.
+
+---
+
+### Option B Implementation Guide
+
+#### 1. Add MCP Dependencies
+
+```bash
+npm install @modelcontextprotocol/sdk --workspace=backend
+```
+
+#### 2. Create MCP Routes
+
+```typescript
+// backend/src/routes/mcp/index.ts
+import { FastifyInstance } from 'fastify';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { createHiltMcpServer } from './server.js';
+
+export async function registerMcpRoutes(app: FastifyInstance) {
+  // Store active transports for cleanup
+  const transports = new Map<string, SSEServerTransport>();
+
+  app.get('/mcp/sse', {
+    schema: {
+      querystring: {
+        type: 'object',
+        properties: {
+          source_id: { type: 'string', format: 'uuid' }
+        }
+      }
+    }
+  }, async (request, reply) => {
+    const apiKey = request.headers['x-api-key'] as string;
+
+    // Validate API key and get source
+    const source = await app.services.auth.validateApiKey(apiKey);
+    if (!source) {
+      return reply.code(401).send({ error: 'Invalid API key' });
+    }
+
+    // Create MCP server with source context
+    const mcpServer = createHiltMcpServer({
+      sourceId: source.id,
+      services: app.services,
+    });
+
+    // Setup SSE transport
+    const transport = new SSEServerTransport('/mcp/messages', reply.raw);
+    transports.set(source.id, transport);
+
+    request.raw.on('close', () => {
+      transports.delete(source.id);
+      transport.close();
+    });
+
+    await mcpServer.connect(transport);
+  });
+
+  app.post('/mcp/messages', async (request, reply) => {
+    const apiKey = request.headers['x-api-key'] as string;
+    const source = await app.services.auth.validateApiKey(apiKey);
+
+    if (!source) {
+      return reply.code(401).send({ error: 'Invalid API key' });
+    }
+
+    const transport = transports.get(source.id);
+    if (!transport) {
+      return reply.code(400).send({ error: 'No active SSE connection' });
+    }
+
+    await transport.handlePostMessage(request, reply);
+  });
+}
+```
+
+#### 3. MCP Server Implementation
+
+```typescript
+// backend/src/routes/mcp/server.ts
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
+
+interface McpServerConfig {
+  sourceId: string;
+  services: AppServices;
+}
+
+export function createHiltMcpServer(config: McpServerConfig) {
+  const server = new Server(
+    { name: 'hilt-review', version: '1.0.0' },
+    { capabilities: { tools: {} } }
+  );
+
+  // Tool definitions
+  const tools = [
+    {
+      name: 'hilt_create_task',
+      description: 'Submit a proposed action for human review',
+      inputSchema: { /* ... */ },
+      execute: async (args: any) => {
+        const task = await config.services.tasks.create({
+          source_id: config.sourceId,
+          ...args,
+        });
+        return { task_id: task.id, status: task.status };
+      },
+    },
+    // ... other tools
+  ];
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: tools.map(t => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema,
+    })),
+  }));
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const tool = tools.find(t => t.name === request.params.name);
+    if (!tool) throw new Error(`Unknown tool: ${request.params.name}`);
+
+    const result = await tool.execute(request.params.arguments);
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    };
+  });
+
+  return server;
+}
+```
+
+#### 4. Health Check
+
+```typescript
+// Add to existing health routes
+app.get('/mcp/health', async () => {
+  return {
+    status: 'ok',
+    transport: 'sse',
+    version: '1.0.0',
+  };
+});
+```
+
+---
+
+### Uptime Guarantees
+
+| Component | Platform | SLA | Notes |
+|-----------|----------|-----|-------|
+| Backend API | Railway | 99.9% | Auto-restarts on crash |
+| Backend API | Render | 99.9% | Free tier has cold starts |
+| MCP (Option B) | Same | Same | Shares backend uptime |
+| Database | Neon | 99.95% | Serverless, auto-scaling |
+
+**For production workloads:**
+- Railway paid tier: $5/mo base + usage
+- Render paid tier: $7/mo
+- Both provide zero-downtime deploys
+
+---
+
+### Monitoring MCP Endpoints
+
+```typescript
+// Add metrics for MCP usage
+app.addHook('onResponse', (request, reply, done) => {
+  if (request.url.startsWith('/mcp/')) {
+    metrics.increment('mcp.requests', {
+      method: request.method,
+      path: request.url,
+      status: reply.statusCode,
+    });
+  }
+  done();
+});
+```
+
+---
+
+## 10. Example Agent Workflow
 
 ### Email Approval Agent
 
@@ -929,29 +1303,42 @@ async function sendEmailWithApproval(to: string, subject: string, body: string) 
 
 ---
 
-## 10. Summary
+## 11. Summary
 
 | Question | Answer |
 |----------|--------|
 | **What is MCP?** | Open protocol for AI tools, standardizes discovery and invocation |
 | **Why use it?** | Agents can discover and use HILT-Review without custom HTTP code |
-| **Architecture impact?** | None - MCP server wraps existing REST API |
-| **API changes needed?** | None required; optional enhancements possible |
-| **How do users install?** | Add to MCP config with API key and source ID |
+| **Architecture impact?** | Minimal - add `/mcp/*` routes to existing backend (Option B) |
+| **API changes needed?** | None to REST API; add MCP routes for Option B |
+| **Hosting cost?** | **$0** for Options A & B; $5-20/mo for Option C |
+| **Uptime?** | ~99.9% (same as REST API) for Options B & C |
+| **How do users install?** | Add to MCP config with API key and URL |
 | **How is it discoverable?** | MCP `list_tools` returns available operations |
-| **Where does MCP server run?** | Client-side, alongside the agent |
-| **Package distribution?** | NPM: `@hilt-review/mcp-server` |
+| **Recommended option?** | **Option B** (integrated) for teams; Option A for individuals |
 
-### Files to Create
+### Deployment Options Summary
 
-1. `packages/mcp-server/` - MCP server implementation
-2. Update `package.json` - Add workspace
-3. Update README - Document MCP option
+| Option | Description | Cost | Best For |
+|--------|-------------|------|----------|
+| **A** | Client-side NPM package (stdio) | $0 | Individual devs |
+| **B** | Integrated into backend (HTTP/SSE) | $0 | Teams, production |
+| **C** | Dedicated MCP service | $5-20/mo | Enterprise, high-volume |
+
+### Files to Create/Modify
+
+**For Option A (client-side):**
+1. `packages/mcp-server/` - Standalone NPM package
+2. Publish to NPM as `@hilt-review/mcp-server`
+
+**For Option B (integrated - recommended):**
+1. `backend/src/routes/mcp/index.ts` - MCP route handlers
+2. `backend/src/routes/mcp/server.ts` - MCP server implementation
+3. Add `@modelcontextprotocol/sdk` dependency
 
 ### No Changes Required To
 
-- OpenAPI spec
-- Backend API
+- OpenAPI spec (REST API unchanged)
 - Frontend
 - Database schema
-- Deployment infrastructure
+- Existing REST endpoints
