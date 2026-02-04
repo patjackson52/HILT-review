@@ -9,5 +9,8 @@ export default defineConfig({
       },
     },
     testTimeout: 30000,
+    env: {
+      DATABASE_URL: 'postgresql://hilt:localdev@localhost:5433/hilt_review',
+    },
   },
 });
