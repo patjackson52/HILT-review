@@ -1,10 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import { reviewTaskService } from '../services/review-task.service.js';
 import { CreateReviewTaskSchema, ListReviewTasksQuerySchema, PatchBlocksSchema, SubmitDecisionSchema } from '../domain/schemas.js';
-import { requireApiKey, requireMatchingSource } from '../middleware/auth.js';
+import { requireApiKey, requireMatchingSource, requireSession } from '../middleware/auth.js';
 
 export async function reviewTasksRoutes(app: FastifyInstance) {
-  // Create review task (requires API key)
+  // Create review task (requires API key from agent)
   app.post('/review-tasks', {
     preHandler: [requireApiKey, requireMatchingSource('source_id')],
   }, async (request, reply) => {
@@ -13,13 +13,17 @@ export async function reviewTasksRoutes(app: FastifyInstance) {
     return reply.status(201).send(task);
   });
 
-  // Get review task by ID
-  app.get<{ Params: { id: string } }>('/review-tasks/:id', async (request) => {
+  // Get review task by ID (requires session - reviewer access)
+  app.get<{ Params: { id: string } }>('/review-tasks/:id', {
+    preHandler: [requireSession],
+  }, async (request) => {
     return reviewTaskService.getById(request.params.id);
   });
 
-  // List review tasks
-  app.get('/review-tasks', async (request) => {
+  // List review tasks (requires session - reviewer access)
+  app.get('/review-tasks', {
+    preHandler: [requireSession],
+  }, async (request) => {
     const query = ListReviewTasksQuerySchema.parse(request.query);
     const result = await reviewTaskService.list({
       sourceId: query.source_id,
@@ -38,16 +42,21 @@ export async function reviewTasksRoutes(app: FastifyInstance) {
     };
   });
 
-  // Update working blocks
-  app.patch<{ Params: { id: string } }>('/review-tasks/:id/blocks', async (request) => {
+  // Update working blocks (requires session - reviewer access)
+  app.patch<{ Params: { id: string } }>('/review-tasks/:id/blocks', {
+    preHandler: [requireSession],
+  }, async (request) => {
     const input = PatchBlocksSchema.parse(request.body);
     return reviewTaskService.updateBlocks(request.params.id, input);
   });
 
-  // Submit decision
-  app.post<{ Params: { id: string } }>('/review-tasks/:id/decision', async (request) => {
+  // Submit decision (requires session - reviewer access)
+  app.post<{ Params: { id: string } }>('/review-tasks/:id/decision', {
+    preHandler: [requireSession],
+  }, async (request) => {
     const input = SubmitDecisionSchema.parse(request.body);
-    // TODO: Get decidedBy from session when auth is implemented
-    return reviewTaskService.submitDecision(request.params.id, input);
+    // Get decidedBy from session
+    const decidedBy = request.userId;
+    return reviewTaskService.submitDecision(request.params.id, input, decidedBy);
   });
 }

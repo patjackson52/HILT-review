@@ -1,10 +1,48 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { apiKeyService, ApiKeyInfo } from '../services/api-key.service.js';
 import { UnauthorizedError, ForbiddenError } from '../domain/errors.js';
+import { config } from '../config/index.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
     apiKey?: ApiKeyInfo;
+    userId?: string;
+  }
+}
+
+/**
+ * Middleware that requires a valid session (user login).
+ * In development and test modes, allows unauthenticated access for easier testing.
+ */
+export async function requireSession(
+  request: FastifyRequest,
+  _reply: FastifyReply
+): Promise<void> {
+  // In development or test mode, allow unauthenticated access
+  if ((config.NODE_ENV === 'development' || config.NODE_ENV === 'test') && !request.session?.userId) {
+    request.userId = 'dev-user';
+    return;
+  }
+
+  if (!request.session?.userId) {
+    throw new UnauthorizedError('Authentication required. Please log in.');
+  }
+
+  request.userId = request.session.userId;
+}
+
+/**
+ * Middleware that optionally extracts user from session.
+ * Does not require authentication but provides user info if available.
+ */
+export async function optionalSession(
+  request: FastifyRequest,
+  _reply: FastifyReply
+): Promise<void> {
+  if (request.session?.userId) {
+    request.userId = request.session.userId;
+  } else if (config.NODE_ENV === 'development' || config.NODE_ENV === 'test') {
+    request.userId = 'dev-user';
   }
 }
 
