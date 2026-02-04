@@ -1,0 +1,38 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding-bottom: 6rem;
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 3rem;
+  color: var(--color-text-muted);
+}
+
+.error {
+  color: var(--color-danger);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.error p {
+  margin: 0;
+}
+
+.backLink {
+  background: transparent;
+  color: var(--color-primary);
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.backLink:hover {
+  background: rgba(59, 130, 246, 0.1);
+}

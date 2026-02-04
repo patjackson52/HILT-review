@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HILT-Review API
-  version: 1.3.0
+  version: 2.0.0
   description: >
     Human-in-the-loop review gatekeeper for async headless agent pipelines.
     Agents propose actions as Review Tasks. Humans edit/approve/deny.
@@ -289,6 +289,47 @@ components:
       type: string
       enum: [LOW, NORMAL, HIGH]
 
+    RiskLevel:
+      type: string
+      enum: [low, medium, high, critical]
+      description: >
+        Risk level indicating consequence severity.
+        - low: Easily reversible, private scope (drafts, notes, archive)
+        - medium: Limited audience, some friction to undo (reply to known contact)
+        - high: Broad audience, hard to undo (public post, external email)
+        - critical: Irreversible, financial/legal (transactions, deletions)
+
+    ServiceIdentifier:
+      type: object
+      description: Identifies the service/platform for visual display in UI.
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          description: Machine identifier (e.g., "gmail", "notion", "twitter", "slack").
+        name:
+          type: string
+          description: Human-readable name (e.g., "Gmail", "Notion", "Twitter").
+        icon:
+          type: string
+          description: Icon key or emoji for UI display (e.g., "✉️", "📓", "🐦").
+
+    ActionIdentifier:
+      type: object
+      description: Identifies the action type for visual display in UI.
+      required: [type, verb]
+      properties:
+        type:
+          type: string
+          enum: [send, reply, post, create, update, delete, archive, schedule, transfer, notify]
+          description: Machine-readable action type.
+        verb:
+          type: string
+          description: Human-readable verb for display (e.g., "Reply", "Post publicly", "Transfer $450").
+        icon:
+          type: string
+          description: Icon key or emoji for UI display (e.g., "📤", "📢", "💰").
+
     ReviewTaskStatus:
       type: string
       enum: [PENDING, APPROVED, DENIED, DISPATCHED, ARCHIVED]
@@ -307,7 +348,10 @@ components:
       properties:
         id:
           type: string
-          description: Stable identifier for referencing/editing/diffing a block.
+          description: Stable machine identifier for referencing/editing/diffing a block (e.g., "email_subject").
+        label:
+          type: string
+          description: Human-readable label for UI display (e.g., "Email Subject"). Provided by agent.
         type:
           $ref: "#/components/schemas/BlockType"
         content:
@@ -503,7 +547,7 @@ components:
     # -------- Review Task --------
     ReviewTask:
       type: object
-      required: [id, source_id, source_name, status, priority, summary, blocks_original, blocks_working, created_at]
+      required: [id, source_id, source_name, status, priority, title, service, action, risk_level, blocks_original, blocks_working, created_at]
       properties:
         id:
           $ref: "#/components/schemas/UUID"
@@ -511,14 +555,32 @@ components:
           $ref: "#/components/schemas/UUID"
         source_name:
           type: string
-          description: Human-readable name of the source (denormalized for display).
+          description: Human-readable name of the source configuration (denormalized for display).
         status:
           $ref: "#/components/schemas/ReviewTaskStatus"
         priority:
           $ref: "#/components/schemas/Priority"
-        summary:
+        title:
           type: string
-          description: Short summary for queue display. Derived from metadata.summary or first block content (max 200 chars).
+          description: Task title/summary for display (max 200 chars).
+        preview:
+          type: string
+          description: Preview of main content for card display (max 100 chars).
+        service:
+          $ref: "#/components/schemas/ServiceIdentifier"
+          description: The target service where the action will execute (e.g., Gmail, Twitter).
+        source_service:
+          $ref: "#/components/schemas/ServiceIdentifier"
+          description: For cross-service flows, the originating service (e.g., Notion notes → Gmail email).
+        action:
+          $ref: "#/components/schemas/ActionIdentifier"
+          description: The action that will be performed if approved.
+        risk_level:
+          $ref: "#/components/schemas/RiskLevel"
+          description: Risk level for UI friction scaling.
+        risk_warning:
+          type: string
+          description: Warning message for high/critical risk tasks (e.g., "Irreversible financial transaction").
         interaction_schema:
           $ref: "#/components/schemas/InteractionSchema"
         blocks_original:
@@ -556,7 +618,7 @@ components:
     ReviewTaskListItem:
       type: object
       description: Lightweight task representation for queue listing (excludes full block content).
-      required: [id, source_id, source_name, status, priority, summary, created_at]
+      required: [id, source_id, source_name, status, priority, title, service, action, risk_level, created_at]
       properties:
         id:
           $ref: "#/components/schemas/UUID"
@@ -564,14 +626,32 @@ components:
           $ref: "#/components/schemas/UUID"
         source_name:
           type: string
-          description: Human-readable name of the source.
+          description: Human-readable name of the source configuration.
         status:
           $ref: "#/components/schemas/ReviewTaskStatus"
         priority:
           $ref: "#/components/schemas/Priority"
-        summary:
+        title:
           type: string
-          description: Short summary for queue display (max 200 chars).
+          description: Task title for card display (max 200 chars).
+        preview:
+          type: string
+          description: Preview of main content for card display (max 100 chars).
+        service:
+          $ref: "#/components/schemas/ServiceIdentifier"
+          description: The target service where the action will execute.
+        source_service:
+          $ref: "#/components/schemas/ServiceIdentifier"
+          description: For cross-service flows, the originating service.
+        action:
+          $ref: "#/components/schemas/ActionIdentifier"
+          description: The action that will be performed if approved.
+        risk_level:
+          $ref: "#/components/schemas/RiskLevel"
+          description: Risk level for visual indication (card border color).
+        risk_warning:
+          type: string
+          description: Warning message for high/critical risk tasks.
         block_count:
           type: integer
           description: Number of artifact blocks in the task.
@@ -669,10 +749,28 @@ components:
 
     CreateReviewTaskRequest:
       type: object
-      required: [source_id, blocks]
+      required: [source_id, title, service, action, risk_level, blocks]
       properties:
         source_id:
           $ref: "#/components/schemas/UUID"
+        title:
+          type: string
+          description: Task title for display (max 200 chars).
+        service:
+          $ref: "#/components/schemas/ServiceIdentifier"
+          description: The target service where the action will execute.
+        source_service:
+          $ref: "#/components/schemas/ServiceIdentifier"
+          description: For cross-service flows, the originating service.
+        action:
+          $ref: "#/components/schemas/ActionIdentifier"
+          description: The action that will be performed if approved.
+        risk_level:
+          $ref: "#/components/schemas/RiskLevel"
+          description: Risk level for UI friction scaling. Agent should set appropriately based on action type and audience.
+        risk_warning:
+          type: string
+          description: Warning message for high/critical risk tasks (e.g., "Irreversible financial transaction").
         priority:
           $ref: "#/components/schemas/Priority"
         interaction_schema:
@@ -836,10 +934,28 @@ paths:
           name: source_id
           schema:
             $ref: "#/components/schemas/UUID"
+          description: Filter by source configuration ID.
         - in: query
           name: status
           schema:
             $ref: "#/components/schemas/ReviewTaskStatus"
+          description: Filter by task status.
+        - in: query
+          name: risk_level
+          schema:
+            $ref: "#/components/schemas/RiskLevel"
+          description: Filter by risk level.
+        - in: query
+          name: service_id
+          schema:
+            type: string
+          description: Filter by target service ID (e.g., "gmail", "twitter").
+        - in: query
+          name: action_type
+          schema:
+            type: string
+            enum: [send, reply, post, create, update, delete, archive, schedule, transfer, notify]
+          description: Filter by action type.
         - in: query
           name: limit
           schema:

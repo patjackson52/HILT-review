@@ -1,0 +1,132 @@
+.header {
+  background: var(--color-bg-card);
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow);
+}
+
+.headerTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.backButton {
+  background: transparent;
+  color: var(--color-text-muted);
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+  border: none;
+  cursor: pointer;
+}
+
+.backButton:hover {
+  color: var(--color-primary);
+}
+
+.riskBadge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.riskBadge.low {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--risk-low);
+}
+
+.riskBadge.medium {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--risk-medium);
+}
+
+.riskBadge.high {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--risk-high);
+}
+
+.riskBadge.critical {
+  background: rgba(124, 45, 18, 0.1);
+  color: var(--risk-critical);
+}
+
+.taskMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.service {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.action {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.separator {
+  color: var(--color-text-muted);
+}
+
+.sourceService {
+  color: var(--color-text-muted);
+}
+
+.icon {
+  font-size: 1rem;
+}
+
+.title {
+  font-size: 1.5rem;
+  margin: 0 0 0.5rem 0;
+  color: var(--color-text);
+}
+
+.warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  color: var(--color-danger);
+  font-size: 0.875rem;
+  padding: 0.75rem;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: var(--radius);
+  margin-top: 1rem;
+}
+
+.warningIcon {
+  flex-shrink: 0;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.source, .time {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}

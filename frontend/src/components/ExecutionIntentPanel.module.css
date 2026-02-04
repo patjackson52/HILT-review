@@ -1,0 +1,97 @@
+.panel {
+  background: var(--color-bg-card);
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow);
+  border-left: 3px solid var(--color-primary);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  margin: 0 0 1rem 0;
+  color: var(--color-text);
+}
+
+.titleIcon {
+  font-size: 1.25rem;
+}
+
+.kindBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 1rem;
+}
+
+.kindIcon {
+  font-size: 1rem;
+}
+
+.templateId {
+  background: var(--color-bg-card);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.6875rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--color-text-muted);
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.detailRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.detailLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  min-width: 4rem;
+}
+
+.detailValue {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.actionIcon {
+  font-size: 1.125rem;
+}
+
+.warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  color: var(--color-warning);
+  font-size: 0.875rem;
+  padding: 0.75rem;
+  background: rgba(245, 158, 11, 0.1);
+  border-radius: var(--radius);
+  margin-top: 0.5rem;
+}
+
+.warningIcon {
+  flex-shrink: 0;
+}

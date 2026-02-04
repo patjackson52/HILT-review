@@ -1,0 +1,76 @@
+.layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  padding: 0 1.5rem;
+  height: 60px;
+  background: var(--color-bg-card);
+  border-bottom: 1px solid var(--color-border);
+  gap: 2rem;
+}
+
+.logo {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.nav {
+  display: flex;
+  gap: 1rem;
+  flex: 1;
+}
+
+.navLink {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius);
+  transition: color 0.2s, background-color 0.2s;
+}
+
+.navLink:hover {
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  text-decoration: none;
+}
+
+.userMenu {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.userName {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.logoutButton {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.logoutButton:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.main {
+  flex: 1;
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
