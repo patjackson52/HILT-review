@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { reviewTaskService } from '../services/review-task.service.js';
-import { CreateReviewTaskSchema, ListReviewTasksQuerySchema, PatchBlocksSchema } from '../domain/schemas.js';
+import { CreateReviewTaskSchema, ListReviewTasksQuerySchema, PatchBlocksSchema, SubmitDecisionSchema } from '../domain/schemas.js';
 import { requireApiKey, requireMatchingSource } from '../middleware/auth.js';
 
 export async function reviewTasksRoutes(app: FastifyInstance) {
@@ -42,5 +42,12 @@ export async function reviewTasksRoutes(app: FastifyInstance) {
   app.patch<{ Params: { id: string } }>('/review-tasks/:id/blocks', async (request) => {
     const input = PatchBlocksSchema.parse(request.body);
     return reviewTaskService.updateBlocks(request.params.id, input);
+  });
+
+  // Submit decision
+  app.post<{ Params: { id: string } }>('/review-tasks/:id/decision', async (request) => {
+    const input = SubmitDecisionSchema.parse(request.body);
+    // TODO: Get decidedBy from session when auth is implemented
+    return reviewTaskService.submitDecision(request.params.id, input);
   });
 }

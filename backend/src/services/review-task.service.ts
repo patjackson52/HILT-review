@@ -1,9 +1,10 @@
 import { eq, and, desc } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { reviewTasks, sources } from '../db/schema.js';
+import { reviewTasks, sources, reviewDecisions, decisionEvents } from '../db/schema.js';
 import { NotFoundError, InvalidStateError } from '../domain/errors.js';
-import type { CreateReviewTaskInput, PatchBlocksInput } from '../domain/schemas.js';
-import type { ReviewTask, ReviewTaskListItem, ArtifactBlock, ServiceIdentifier, ActionIdentifier, InteractionSchema, ExecutionIntent, ReviewDecision, DecisionDiff } from '@hilt-review/shared';
+import type { CreateReviewTaskInput, PatchBlocksInput, SubmitDecisionInput } from '../domain/schemas.js';
+import type { ReviewTask, ReviewTaskListItem, ArtifactBlock, ServiceIdentifier, ActionIdentifier, InteractionSchema, ExecutionIntent, ReviewDecision, DecisionDiff, DecisionEvent } from '@hilt-review/shared';
+import { diffService } from './diff.service.js';
 
 export class ReviewTaskService {
   async create(input: CreateReviewTaskInput): Promise<ReviewTask> {
@@ -149,6 +150,86 @@ export class ReviewTaskService {
       .returning();
 
     return this.toReviewTask(updated, result.sourceName || 'Unknown');
+  }
+
+  async submitDecision(id: string, input: SubmitDecisionInput, decidedBy?: string): Promise<ReviewTask> {
+    // Get task and verify it exists and is in PENDING status
+    const [result] = await db.select({
+      task: reviewTasks,
+      sourceName: sources.name,
+    })
+      .from(reviewTasks)
+      .leftJoin(sources, eq(reviewTasks.sourceId, sources.id))
+      .where(eq(reviewTasks.id, id));
+
+    if (!result) {
+      throw new NotFoundError('ReviewTask', id);
+    }
+
+    if (result.task.status !== 'PENDING') {
+      throw new InvalidStateError('Decision already submitted', {
+        current_status: result.task.status,
+      });
+    }
+
+    const originalBlocks = result.task.blocksOriginal as ArtifactBlock[];
+    const workingBlocks = result.task.blocksWorking as ArtifactBlock[];
+
+    // Calculate diff
+    const diff = diffService.calculateDiff(originalBlocks, workingBlocks);
+
+    const newStatus = input.decision === 'APPROVE' ? 'APPROVED' : 'DENIED';
+    const now = new Date();
+
+    // Use transaction for atomicity
+    const [updatedTask] = await db.transaction(async (tx) => {
+      // Update task status
+      const [task] = await tx.update(reviewTasks)
+        .set({
+          status: newStatus,
+          blocksFinal: workingBlocks,
+          diff,
+          updatedAt: now,
+        })
+        .where(eq(reviewTasks.id, id))
+        .returning();
+
+      // Insert decision record
+      await tx.insert(reviewDecisions).values({
+        taskId: id,
+        decision: input.decision,
+        reason: input.reason,
+        decidedBy,
+        decidedAt: now,
+      });
+
+      // Insert decision event for outbox
+      await tx.insert(decisionEvents).values({
+        taskId: id,
+        sourceId: result.task.sourceId,
+        decision: input.decision,
+        payload: {
+          event_id: crypto.randomUUID(),
+          source_id: result.task.sourceId,
+          task_id: id,
+          decision: {
+            type: input.decision,
+            reason: input.reason,
+            decided_at: now.toISOString(),
+            decided_by: decidedBy,
+          },
+          original: originalBlocks,
+          final: workingBlocks,
+          diff,
+          metadata: result.task.metadata,
+          occurred_at: now.toISOString(),
+        },
+      });
+
+      return [task];
+    });
+
+    return this.toReviewTask(updatedTask, result.sourceName || 'Unknown');
   }
 
   private toReviewTask(row: typeof reviewTasks.$inferSelect, sourceName: string): ReviewTask {
