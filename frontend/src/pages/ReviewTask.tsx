@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { ReviewTask as ReviewTaskType, RiskLevel } from '@hilt-review/shared';
+import type { ReviewTask as ReviewTaskType, RiskLevel, DecisionType } from '@hilt-review/shared';
+import { getReviewTask, submitDecision as submitDecisionApi } from '../api/client';
 import styles from './ReviewTask.module.css';
 
 const RISK_LABELS: Record<RiskLevel, string> = {
@@ -19,35 +20,19 @@ export default function ReviewTask() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchTask();
+    if (!id) return;
+    getReviewTask(id)
+      .then(setTask)
+      .catch(err => setError(err.message))
+      .finally(() => setIsLoading(false));
   }, [id]);
 
-  async function fetchTask() {
-    try {
-      const response = await fetch(`/api/v1/review-tasks/${id}`);
-      if (!response.ok) throw new Error('Failed to fetch task');
-      const data = await response.json();
-      setTask(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function submitDecision(decision: 'APPROVE' | 'DENY') {
-    if (!task) return;
+  async function handleSubmitDecision(decision: DecisionType) {
+    if (!task || !id) return;
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/v1/review-tasks/${id}/decision`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ decision }),
-      });
-
-      if (!response.ok) throw new Error('Failed to submit decision');
-
+      await submitDecisionApi(id, { decision });
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -126,14 +111,14 @@ export default function ReviewTask() {
 
       <footer className={styles.actions}>
         <button
-          onClick={() => submitDecision('DENY')}
+          onClick={() => handleSubmitDecision('DENY')}
           disabled={isSubmitting}
           className={styles.denyButton}
         >
           Deny
         </button>
         <button
-          onClick={() => submitDecision('APPROVE')}
+          onClick={() => handleSubmitDecision('APPROVE')}
           disabled={isSubmitting}
           className={styles.approveButton}
         >

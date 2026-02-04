@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import type { ReviewTask, RiskLevel } from '@hilt-review/shared';
+import type { RiskLevel } from '@hilt-review/shared';
+import { useReviewTasks } from '../hooks/useReviewTasks';
 import styles from './ReviewQueue.module.css';
 
 const RISK_COLORS: Record<RiskLevel, string> = {
@@ -11,33 +11,14 @@ const RISK_COLORS: Record<RiskLevel, string> = {
 };
 
 export default function ReviewQueue() {
-  const [tasks, setTasks] = useState<ReviewTask[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchTasks();
-  }, []);
-
-  async function fetchTasks() {
-    try {
-      const response = await fetch('/api/v1/review-tasks?status=PENDING');
-      if (!response.ok) throw new Error('Failed to fetch tasks');
-      const data = await response.json();
-      setTasks(data.items);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const { tasks, isLoading, error } = useReviewTasks({ status: 'PENDING' });
 
   if (isLoading) {
     return <div className={styles.loading}>Loading tasks...</div>;
   }
 
   if (error) {
-    return <div className={styles.error}>{error}</div>;
+    return <div className={styles.error}>{error.message}</div>;
   }
 
   return (
