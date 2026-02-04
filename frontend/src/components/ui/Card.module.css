@@ -1,0 +1,30 @@
+.card {
+  background: var(--color-bg-card);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.default {
+  box-shadow: var(--shadow);
+}
+
+.elevated {
+  box-shadow: var(--shadow-lg);
+}
+
+.header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.content {
+  padding: 1.25rem;
+}
+
+.footer {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
