@@ -36,6 +36,7 @@ HILT-Review enables safe, asynchronous human approval of AI-proposed actions bef
 | [Downstream Integration](./hilt_review_downstream_executor_integration.md) | Guide for executors receiving decisions |
 | [Repository Structure](./hilt_review_repo_structure.md) | Recommended project layout |
 | [Authentication](./hilt_review_authentication.md) | OAuth, API keys, and security |
+| [Backend Spec](./docs/backend-spec.md) | Node.js + Fastify + TypeScript architecture |
 | [Deployment Guide](./docs/deployment-guide.md) | Deploy to Vercel + Railway + Neon (free tier) |
 
 ## Architecture
@@ -73,12 +74,17 @@ psql -f db/schema.sql
 ./scripts/dev-up.sh
 ```
 
-## Tech Stack (Recommended)
+## Tech Stack
 
-- **Backend**: Node.js/Express or Python/FastAPI
-- **Frontend**: React with TypeScript
-- **Database**: PostgreSQL 14+
-- **Auth**: Google OAuth 2.0 for reviewers, API keys for integrations
+| Layer | Technology | Why |
+|-------|------------|-----|
+| **Backend** | Node.js + Fastify + TypeScript | Fast, type-safe, excellent ecosystem |
+| **Frontend** | React + TypeScript | Component-based, same language as backend |
+| **Database** | PostgreSQL 15+ | JSONB support, reliable, portable |
+| **Auth** | Google OAuth 2.0 + API Keys | Standard OAuth for reviewers, keys for machines |
+| **Queue** | pg-boss (Postgres-backed) | No Redis needed, transactional guarantees |
+
+See [Backend Spec](./docs/backend-spec.md) for detailed architecture and patterns.
 
 ## API Overview
 

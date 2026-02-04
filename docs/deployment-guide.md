@@ -6,17 +6,17 @@ This guide covers deploying HILT-Review using a portable, serverless-friendly st
 
 | Component | Service | Free Tier | Why |
 |-----------|---------|-----------|-----|
-| **Frontend** | Vercel | Unlimited sites, 100GB bandwidth | Best React/Next.js DX |
-| **Backend** | Railway or Render | $5/month credit or 750 hrs | Standard containers, no lock-in |
-| **Database** | Neon | 512MB, serverless | Standard Postgres, branching |
+| **Frontend** | Vercel | Unlimited sites, 100GB bandwidth | Best React DX |
+| **Backend** | Railway or Render | $5/month credit or 750 hrs | Node.js containers |
+| **Database** | Neon | 512MB, serverless | Standard Postgres + pg-boss |
 | **Auth** | Google OAuth | Free | Standard OAuth 2.0 |
-| **Sessions** | Neon (table) or Upstash Redis | Free tier | Stateless JWT alternative |
+| **Sessions** | Postgres (via Fastify session) | Included | No Redis needed |
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │    Vercel       │     │ Railway/Render  │     │      Neon       │
 │   (Frontend)    │────▶│   (Backend)     │────▶│   (Postgres)    │
-│   React SPA     │     │  Node/Python    │     │                 │
+│  React + Vite   │     │ Node.js/Fastify │     │ + pg-boss queue │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
          │                      │
          │                      ▼
@@ -24,6 +24,12 @@ This guide covers deploying HILT-Review using a portable, serverless-friendly st
          └─────────────▶│  Google OAuth   │
                         └─────────────────┘
 ```
+
+**Tech Stack:**
+- Backend: Node.js 20 + Fastify + TypeScript
+- Frontend: React + Vite + TypeScript
+- Database: PostgreSQL 15 (via Drizzle ORM)
+- Queue: pg-boss (Postgres-backed, no Redis needed)
 
 ---
 
@@ -41,12 +47,19 @@ This guide covers deploying HILT-Review using a portable, serverless-friendly st
 
 ### 1.2 Apply Database Schema
 
+**Option A: Using Drizzle migrations (recommended)**
 ```bash
-# Install psql or use Neon's SQL Editor
-psql "$DATABASE_URL" -f db/schema.sql
+cd backend
+npm run db:migrate
 ```
 
-Or paste the schema from `hilt_review_postgres_schema.md` into Neon's SQL Editor.
+**Option B: Direct SQL**
+```bash
+# Using psql
+psql "$DATABASE_URL" -f db/schema.sql
+
+# Or paste the schema from hilt_review_postgres_schema.md into Neon's SQL Editor
+```
 
 ### 1.3 Environment Variables
 
@@ -112,7 +125,8 @@ ALLOWED_DOMAINS=["yourcompany.com"]
 
 1. Sign up at [railway.app](https://railway.app)
 2. Create new project from GitHub repo
-3. Railway auto-detects Node.js/Python
+3. Set root directory to `backend/`
+4. Railway auto-detects Node.js
 
 #### 3A.2 Configure
 
@@ -167,12 +181,15 @@ Or just push to GitHub - Railway auto-deploys.
 
 | Setting | Value |
 |---------|-------|
-| Environment | Node / Python |
-| Build Command | `npm install && npm run build` |
+| Root Directory | `backend` |
+| Environment | Node |
+| Build Command | `npm ci && npm run build` |
 | Start Command | `npm start` |
 | Instance Type | Free (750 hours/month) |
 
 Add environment variables (same as Railway).
+
+**Note:** The backend uses Fastify and will listen on the `PORT` environment variable provided by Render.
 
 #### 3B.3 Deploy
 
@@ -258,8 +275,8 @@ CORS_ORIGIN=https://hilt-review.com
 ### Frontend (.env.local)
 
 ```bash
-NEXT_PUBLIC_API_URL=https://api.hilt-review.com
-NEXT_PUBLIC_GOOGLE_CLIENT_ID=123456789.apps.googleusercontent.com
+VITE_API_URL=https://api.hilt-review.com
+VITE_GOOGLE_CLIENT_ID=123456789.apps.googleusercontent.com
 ```
 
 ### Generate Secrets
@@ -314,29 +331,49 @@ openssl rand -hex 32
 ### Prerequisites
 
 ```bash
-node >= 18
-npm >= 9
+node >= 20 LTS
+npm >= 10
 docker (optional, for local Postgres)
 ```
 
-### Setup
+### Setup (Monorepo)
 
 ```bash
 # Clone repo
 git clone https://github.com/patjackson52/HILT-review.git
 cd HILT-review
 
-# Backend
-cd backend
-cp .env.example .env
+# Install all dependencies (uses npm workspaces)
 npm install
-npm run dev
 
-# Frontend (new terminal)
-cd frontend
-cp .env.example .env.local
-npm install
+# Set up environment files
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
+
+# Start local Postgres (if using Docker)
+docker-compose up -d postgres
+
+# Run database migrations
+npm run db:migrate
+
+# Start all services (backend on :3000, frontend on :5173)
 npm run dev
+```
+
+### Individual Services
+
+```bash
+# Backend only (with hot reload via tsx)
+cd backend && npm run dev
+
+# Frontend only (Vite dev server)
+cd frontend && npm run dev
+
+# Run tests
+npm run test
+
+# Type checking
+npm run typecheck
 ```
 
 ### Local Database Options
