@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: HILT-Review API
-  version: 1.2.0
+  version: 1.3.0
   description: >
     Human-in-the-loop review gatekeeper for async headless agent pipelines.
     Agents propose actions as Review Tasks. Humans edit/approve/deny.
@@ -338,7 +338,7 @@ components:
           description: UI hints to speed up review (optional).
         options:
           type: array
-          description: Options that apply patches to blocks when selected.
+          description: For 'choice' type - options that apply patches to blocks when selected.
           items:
             type: object
             required: [id, label]
@@ -352,6 +352,34 @@ components:
                 description: Patches that update blocks_working.
                 items:
                   $ref: "#/components/schemas/BlockPatch"
+        deny_reasons:
+          type: array
+          description: Quick deny reason suggestions shown as buttons in the deny modal.
+          items:
+            type: object
+            required: [id, label]
+            properties:
+              id:
+                type: string
+                description: Machine-readable identifier for the reason.
+              label:
+                type: string
+                description: Human-readable label shown on button.
+          example:
+            - id: "incorrect_info"
+              label: "Incorrect information"
+            - id: "wrong_recipient"
+              label: "Wrong recipient"
+            - id: "needs_revision"
+              label: "Needs revision"
+        external_url:
+          type: string
+          format: uri
+          description: For 'external' type - URL to open for external review. User must confirm they completed external action.
+        require_confirmation:
+          type: boolean
+          default: true
+          description: If true (default), show confirmation modal before approve/deny.
 
     BlockPatch:
       type: object
@@ -475,16 +503,22 @@ components:
     # -------- Review Task --------
     ReviewTask:
       type: object
-      required: [id, source_id, status, priority, blocks_original, blocks_working, created_at]
+      required: [id, source_id, source_name, status, priority, summary, blocks_original, blocks_working, created_at]
       properties:
         id:
           $ref: "#/components/schemas/UUID"
         source_id:
           $ref: "#/components/schemas/UUID"
+        source_name:
+          type: string
+          description: Human-readable name of the source (denormalized for display).
         status:
           $ref: "#/components/schemas/ReviewTaskStatus"
         priority:
           $ref: "#/components/schemas/Priority"
+        summary:
+          type: string
+          description: Short summary for queue display. Derived from metadata.summary or first block content (max 200 chars).
         interaction_schema:
           $ref: "#/components/schemas/InteractionSchema"
         blocks_original:
@@ -505,6 +539,9 @@ components:
           $ref: "#/components/schemas/ReviewDecision"
         dispatch:
           $ref: "#/components/schemas/DispatchInfo"
+        execution_intent:
+          $ref: "#/components/schemas/ExecutionIntent"
+          description: Extracted from execution_intent block for UI display.
         metadata:
           type: object
           description: Arbitrary metadata (trace_id, external ids, tags).
@@ -514,6 +551,66 @@ components:
           $ref: "#/components/schemas/Timestamp"
         archived_at:
           $ref: "#/components/schemas/Timestamp"
+
+    # -------- Review Task List Item (lightweight for queue) --------
+    ReviewTaskListItem:
+      type: object
+      description: Lightweight task representation for queue listing (excludes full block content).
+      required: [id, source_id, source_name, status, priority, summary, created_at]
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        source_id:
+          $ref: "#/components/schemas/UUID"
+        source_name:
+          type: string
+          description: Human-readable name of the source.
+        status:
+          $ref: "#/components/schemas/ReviewTaskStatus"
+        priority:
+          $ref: "#/components/schemas/Priority"
+        summary:
+          type: string
+          description: Short summary for queue display (max 200 chars).
+        block_count:
+          type: integer
+          description: Number of artifact blocks in the task.
+        has_changes:
+          type: boolean
+          description: True if blocks_working differs from blocks_original.
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    # -------- Execution Intent (for UI display) --------
+    ExecutionIntent:
+      type: object
+      description: Describes what will happen if the task is approved. Extracted from execution_intent artifact block.
+      properties:
+        kind:
+          type: string
+          enum: [command_template, mcp_tool_call, http_request, custom]
+          description: Type of execution action.
+        template_id:
+          type: string
+          description: Reference to executor-owned command/template.
+        display:
+          type: object
+          description: Human-readable display properties for UI.
+          properties:
+            action_type:
+              type: string
+              description: Human-readable action type (e.g., "Send Email", "Update Config").
+            target:
+              type: string
+              description: Human-readable target description (e.g., "sam@vendor.com").
+            warning:
+              type: string
+              description: Optional warning message (e.g., "External recipient", "Production environment").
+            icon:
+              type: string
+              description: Optional icon identifier for UI.
 
     DispatchInfo:
       type: object
@@ -759,13 +856,19 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [items, total_count]
                 properties:
                   items:
                     type: array
                     items:
-                      $ref: "#/components/schemas/ReviewTask"
+                      $ref: "#/components/schemas/ReviewTaskListItem"
+                    description: Lightweight task items for queue display.
+                  total_count:
+                    type: integer
+                    description: Total number of tasks matching the filter (for pagination display).
                   next_cursor:
                     type: string
+                    description: Cursor for fetching the next page. Null if no more pages.
 
   /review-tasks/{task_id}:
     get:
