@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { eq, and, desc } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { reviewTasks, sources, reviewDecisions, decisionEvents } from '../db/schema.js';
@@ -209,7 +210,7 @@ export class ReviewTaskService {
         sourceId: result.task.sourceId,
         decision: input.decision,
         payload: {
-          event_id: crypto.randomUUID(),
+          event_id: randomUUID(),
           source_id: result.task.sourceId,
           task_id: id,
           decision: {
