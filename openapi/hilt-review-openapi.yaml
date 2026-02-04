@@ -1,0 +1,674 @@
+openapi: 3.1.0
+info:
+  title: HILT-Review API
+  version: 1.1.0
+  description: >
+    Human-in-the-loop review gatekeeper for async headless agent pipelines.
+    Agents propose actions as Review Tasks. Humans edit/approve/deny.
+    HILT-Review emits decisions to downstream executors via per-source webhooks
+    and/or a pull API. Delivery is at-least-once; consumers must dedupe using
+    event IDs and idempotency keys.
+
+servers:
+  - url: https://api.hilt-review.example.com
+
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  headers:
+    IdempotencyKey:
+      description: >
+        Idempotency key for create operations. Same key + same request body should
+        return the same resource.
+      schema:
+        type: string
+
+    WebhookSignature:
+      description: >
+        HMAC signature of webhook body using the source webhook secret.
+        Recommended format: 't=<unix_ts>,v1=<hex_hmac_sha256>'.
+      schema:
+        type: string
+
+  schemas:
+    # -------- Common Types --------
+    UUID:
+      type: string
+      format: uuid
+
+    Timestamp:
+      type: string
+      format: date-time
+
+    Priority:
+      type: string
+      enum: [LOW, NORMAL, HIGH]
+
+    ReviewTaskStatus:
+      type: string
+      enum: [PENDING, APPROVED, DENIED, DISPATCHED, ARCHIVED]
+
+    DecisionType:
+      type: string
+      enum: [APPROVE, DENY]
+
+    BlockType:
+      type: string
+      enum: [markdown, plaintext, json]
+
+    ArtifactBlock:
+      type: object
+      required: [id, type, content, editable]
+      properties:
+        id:
+          type: string
+          description: Stable identifier for referencing/editing/diffing a block.
+        type:
+          $ref: "#/components/schemas/BlockType"
+        content:
+          description: Block contents; string for markdown/plaintext, object for json.
+          oneOf:
+            - type: string
+            - type: object
+        editable:
+          type: boolean
+        render_hints:
+          type: object
+          properties:
+            preview:
+              type: boolean
+            syntax_highlighting:
+              type: boolean
+
+    InteractionSchema:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [edit, confirm, choice, external]
+        # Optional guidance layer; never removes editability.
+        guidance:
+          type: object
+          description: UI hints to speed up review (optional).
+        options:
+          type: array
+          description: Options that apply patches to blocks when selected.
+          items:
+            type: object
+            required: [id, label]
+            properties:
+              id:
+                type: string
+              label:
+                type: string
+              patches:
+                type: array
+                description: Patches that update blocks_working.
+                items:
+                  $ref: "#/components/schemas/BlockPatch"
+
+    BlockPatch:
+      type: object
+      required: [block_id, op]
+      properties:
+        block_id:
+          type: string
+        op:
+          type: string
+          enum: [replace]
+        value:
+          oneOf:
+            - type: string
+            - type: object
+
+    TextDiff:
+      type: object
+      required: [block_id, unified_diff]
+      properties:
+        block_id:
+          type: string
+        unified_diff:
+          type: string
+          description: Unified diff for markdown/plaintext blocks.
+
+    JsonPatch:
+      type: object
+      required: [block_id, patch]
+      properties:
+        block_id:
+          type: string
+        patch:
+          type: array
+          description: RFC 6902 JSON Patch operations.
+          items:
+            type: object
+            required: [op, path]
+            properties:
+              op:
+                type: string
+                enum: [add, remove, replace, move, copy, test]
+              path:
+                type: string
+              from:
+                type: string
+              value: {}
+
+    DecisionDiff:
+      type: object
+      properties:
+        text_diffs:
+          type: array
+          items:
+            $ref: "#/components/schemas/TextDiff"
+        json_patches:
+          type: array
+          items:
+            $ref: "#/components/schemas/JsonPatch"
+
+    ReviewDecision:
+      type: object
+      required: [type, decided_at]
+      properties:
+        type:
+          $ref: "#/components/schemas/DecisionType"
+        reason:
+          type: string
+          description: Required when DENY; optional when APPROVE.
+        decided_at:
+          $ref: "#/components/schemas/Timestamp"
+        decided_by:
+          type: string
+          description: Reviewer identifier (string for MVP).
+
+    # -------- Source / Integration --------
+    Source:
+      type: object
+      required: [id, name, created_at, delivery]
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        name:
+          type: string
+          description: Human-readable name for upstream integration/source.
+        description:
+          type: string
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        delivery:
+          $ref: "#/components/schemas/SourceDeliveryConfig"
+
+    SourceDeliveryConfig:
+      type: object
+      required: [mode, webhook]
+      properties:
+        mode:
+          type: string
+          enum: [WEBHOOK_ONLY, PULL_ONLY, WEBHOOK_AND_PULL]
+        webhook:
+          type: object
+          required: [enabled]
+          properties:
+            enabled:
+              type: boolean
+            url:
+              type: string
+              description: Webhook URL for downstream executor (per source).
+            secret:
+              type: string
+              description: Webhook signing secret (store hashed/secured).
+            timeout_ms:
+              type: integer
+              default: 5000
+            max_attempts:
+              type: integer
+              default: 10
+            retry_backoff_seconds:
+              type: integer
+              default: 30
+
+    # -------- Review Task --------
+    ReviewTask:
+      type: object
+      required: [id, source_id, status, priority, blocks_original, blocks_working, created_at]
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        source_id:
+          $ref: "#/components/schemas/UUID"
+        status:
+          $ref: "#/components/schemas/ReviewTaskStatus"
+        priority:
+          $ref: "#/components/schemas/Priority"
+        interaction_schema:
+          $ref: "#/components/schemas/InteractionSchema"
+        blocks_original:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactBlock"
+        blocks_working:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactBlock"
+        blocks_final:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactBlock"
+        diff:
+          $ref: "#/components/schemas/DecisionDiff"
+        decision:
+          $ref: "#/components/schemas/ReviewDecision"
+        dispatch:
+          $ref: "#/components/schemas/DispatchInfo"
+        metadata:
+          type: object
+          description: Arbitrary metadata (trace_id, external ids, tags).
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+        updated_at:
+          $ref: "#/components/schemas/Timestamp"
+        archived_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    DispatchInfo:
+      type: object
+      properties:
+        last_delivery_status:
+          type: string
+          enum: [NOT_SENT, IN_PROGRESS, DELIVERED, FAILED]
+        last_attempt_at:
+          $ref: "#/components/schemas/Timestamp"
+        attempt_count:
+          type: integer
+        # event_id is what downstream dedupes on (at-least-once delivery).
+        decision_event_id:
+          $ref: "#/components/schemas/UUID"
+
+    # -------- Decision Event (Webhook + Pull) --------
+    DecisionEvent:
+      type: object
+      required: [event_id, source_id, task_id, decision, original, final, diff, occurred_at]
+      properties:
+        event_id:
+          $ref: "#/components/schemas/UUID"
+          description: Stable event ID used for consumer deduplication.
+        source_id:
+          $ref: "#/components/schemas/UUID"
+        task_id:
+          $ref: "#/components/schemas/UUID"
+        decision:
+          $ref: "#/components/schemas/ReviewDecision"
+        original:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactBlock"
+        final:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactBlock"
+        diff:
+          $ref: "#/components/schemas/DecisionDiff"
+        metadata:
+          type: object
+        occurred_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    # -------- Requests --------
+    CreateSourceRequest:
+      type: object
+      required: [name, delivery]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        delivery:
+          $ref: "#/components/schemas/SourceDeliveryConfig"
+
+    CreateReviewTaskRequest:
+      type: object
+      required: [source_id, blocks]
+      properties:
+        source_id:
+          $ref: "#/components/schemas/UUID"
+        priority:
+          $ref: "#/components/schemas/Priority"
+        interaction_schema:
+          $ref: "#/components/schemas/InteractionSchema"
+        blocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactBlock"
+        metadata:
+          type: object
+
+    PatchBlocksRequest:
+      type: object
+      required: [blocks_working]
+      properties:
+        blocks_working:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactBlock"
+
+    SubmitDecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          $ref: "#/components/schemas/DecisionType"
+        reason:
+          type: string
+
+    AckDecisionEventRequest:
+      type: object
+      required: [event_id]
+      properties:
+        event_id:
+          $ref: "#/components/schemas/UUID"
+
+paths:
+  # ---------------- Sources ----------------
+  /sources:
+    post:
+      summary: Create a source (per-integration configuration)
+      operationId: createSource
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSourceRequest"
+      responses:
+        "201":
+          description: Source created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Source"
+
+    get:
+      summary: List sources
+      operationId: listSources
+      responses:
+        "200":
+          description: Sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Source"
+
+  /sources/{source_id}:
+    get:
+      summary: Get a source
+      operationId: getSource
+      parameters:
+        - in: path
+          name: source_id
+          required: true
+          schema:
+            $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Source
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Source"
+
+    patch:
+      summary: Update source configuration
+      operationId: patchSource
+      parameters:
+        - in: path
+          name: source_id
+          required: true
+          schema:
+            $ref: "#/components/schemas/UUID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSourceRequest"
+      responses:
+        "200":
+          description: Source updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Source"
+
+  # ---------------- Review Tasks ----------------
+  /review-tasks:
+    post:
+      summary: Enqueue a review task (agent-proposed action awaiting human gate)
+      operationId: createReviewTask
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: false
+          schema:
+            type: string
+          description: Idempotency key for safely retrying task creation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewTaskRequest"
+      responses:
+        "201":
+          description: Review task created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewTask"
+
+    get:
+      summary: List review tasks
+      operationId: listReviewTasks
+      parameters:
+        - in: query
+          name: source_id
+          schema:
+            $ref: "#/components/schemas/UUID"
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/ReviewTaskStatus"
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tasks page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReviewTask"
+                  next_cursor:
+                    type: string
+
+  /review-tasks/{task_id}:
+    get:
+      summary: Get a review task
+      operationId: getReviewTask
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema:
+            $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Review task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewTask"
+
+  /review-tasks/{task_id}/blocks:
+    patch:
+      summary: Update blocks_working (always editable)
+      operationId: patchReviewTaskBlocks
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema:
+            $ref: "#/components/schemas/UUID"
+        - in: header
+          name: If-Match
+          required: false
+          schema:
+            type: string
+          description: Optional ETag for optimistic concurrency.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchBlocksRequest"
+      responses:
+        "200":
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewTask"
+
+  /review-tasks/{task_id}/decision:
+    post:
+      summary: Submit a decision (gatekeeper output triggers downstream execution on APPROVE)
+      operationId: submitReviewTaskDecision
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema:
+            $ref: "#/components/schemas/UUID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitDecisionRequest"
+      responses:
+        "200":
+          description: Decision recorded; dispatch will occur per source delivery config.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewTask"
+
+  # ---------------- Pull API (per source) ----------------
+  /sources/{source_id}/decision-events:
+    get:
+      summary: Pull decision events for a source (at-least-once)
+      operationId: pullDecisionEvents
+      parameters:
+        - in: path
+          name: source_id
+          required: true
+          schema:
+            $ref: "#/components/schemas/UUID"
+        - in: query
+          name: after
+          schema:
+            type: string
+            description: Cursor or event_id to page forward (implementation-defined).
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: Decision events page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DecisionEvent"
+                  next_cursor:
+                    type: string
+
+  /sources/{source_id}/decision-events/ack:
+    post:
+      summary: Acknowledge receipt of decision events (optional but recommended)
+      operationId: ackDecisionEvents
+      parameters:
+        - in: path
+          name: source_id
+          required: true
+          schema:
+            $ref: "#/components/schemas/UUID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event_ids]
+              properties:
+                event_ids:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/UUID"
+      responses:
+        "200":
+          description: Ack recorded
+
+  # ---------------- Webhook Delivery (documentation-only) ----------------
+  # Webhook is outgoing from HILT-Review to downstream executor configured per source.
+  # This is described here for payload contract; it is NOT an inbound endpoint.
+  /webhooks/decision-event:
+    post:
+      summary: (Outgoing) Decision event delivery payload contract
+      description: >
+        This is an outgoing webhook from HILT-Review to a downstream executor.
+        HILT-Review will POST a DecisionEvent to the per-source configured webhook URL.
+        Delivery is at-least-once; downstream must dedupe via event_id.
+      operationId: webhookContractDecisionEvent
+      security: []
+      parameters:
+        - in: header
+          name: X-HILT-Signature
+          required: true
+          schema:
+            type: string
+          description: HMAC signature header (see components.headers.WebhookSignature).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisionEvent"
+      responses:
+        "200":
+          description: Downstream acknowledges receipt (idempotent).
