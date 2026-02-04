@@ -36,6 +36,7 @@ export class ReviewTaskService {
       riskLevel: input.risk_level,
       riskWarning: input.risk_warning,
       interactionSchema: input.interaction_schema,
+      executionIntent: input.execution_intent,
       blocksOriginal: input.blocks,
       blocksWorking: input.blocks,
       metadata: input.metadata,

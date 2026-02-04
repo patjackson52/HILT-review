@@ -54,6 +54,18 @@ export const InteractionSchemaSchema = z.object({
   require_confirmation: z.boolean().optional(),
 });
 
+// Execution Intent
+export const ExecutionIntentSchema = z.object({
+  kind: z.enum(['command_template', 'mcp_tool_call', 'http_request', 'custom']),
+  template_id: z.string().optional(),
+  display: z.object({
+    action_type: z.string().optional(),
+    target: z.string().optional(),
+    warning: z.string().optional(),
+    icon: z.string().optional(),
+  }).optional(),
+});
+
 // Create Review Task Request
 export const CreateReviewTaskSchema = z.object({
   source_id: z.string().uuid(),
@@ -65,6 +77,7 @@ export const CreateReviewTaskSchema = z.object({
   risk_warning: z.string().optional(),
   priority: PrioritySchema.optional().default('NORMAL'),
   interaction_schema: InteractionSchemaSchema.optional(),
+  execution_intent: ExecutionIntentSchema.optional(),
   blocks: z.array(ArtifactBlockSchema).min(1),
   metadata: z.record(z.unknown()).optional(),
 });
