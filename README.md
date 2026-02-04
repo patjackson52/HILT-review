@@ -39,6 +39,7 @@ HILT-Review enables safe, asynchronous human approval of AI-proposed actions bef
 | [Authentication](./hilt_review_authentication.md) | OAuth, API keys, and security |
 | [Backend Spec](./docs/backend-spec.md) | Node.js + Fastify + TypeScript architecture |
 | [Deployment Guide](./docs/deployment-guide.md) | Deploy to Vercel + Railway + Neon (free tier) |
+| [Testing Strategy](./docs/testing-strategy.md) | Unit tests, integration tests, test data, dev workflows |
 
 ## Architecture
 
