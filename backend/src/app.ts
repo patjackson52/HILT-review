@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import cookie from '@fastify/cookie';
 import session from '@fastify/session';
+import rateLimit from '@fastify/rate-limit';
 import { config } from './config/index.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { registerRoutes } from './routes/index.js';
@@ -20,6 +21,13 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(cors, {
     origin: config.CORS_ORIGIN || true,
     credentials: true,
+  });
+
+  // Rate limiting
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: '1 minute',
+    allowList: config.NODE_ENV === 'test' ? ['127.0.0.1'] : [],
   });
 
   // Cookie and session support
