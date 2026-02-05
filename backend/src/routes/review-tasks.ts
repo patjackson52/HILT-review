@@ -2,11 +2,16 @@ import { FastifyInstance } from 'fastify';
 import { reviewTaskService } from '../services/review-task.service.js';
 import { CreateReviewTaskSchema, ListReviewTasksQuerySchema, PatchBlocksSchema, SubmitDecisionSchema } from '../domain/schemas.js';
 import { requireApiKey, requireMatchingSource, requireSession } from '../middleware/auth.js';
+import { idempotencyPlugin, requireIdempotency } from '../middleware/idempotency.js';
 
 export async function reviewTasksRoutes(app: FastifyInstance) {
+  // Register idempotency plugin for this route scope
+  await app.register(idempotencyPlugin);
+
   // Create review task (requires API key from agent)
+  // Supports Idempotency-Key header to prevent duplicate creation on retries
   app.post('/review-tasks', {
-    preHandler: [requireApiKey, requireMatchingSource('source_id')],
+    preHandler: [requireApiKey, requireMatchingSource('source_id'), requireIdempotency],
   }, async (request, reply) => {
     const input = CreateReviewTaskSchema.parse(request.body);
     const task = await reviewTaskService.create(input);
