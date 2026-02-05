@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.env.local
+*.log
+.turbo
+.DS_Store
+coverage
+.git
+e2e
+docs
