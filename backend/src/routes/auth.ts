@@ -37,8 +37,8 @@ export async function authRoutes(app: FastifyInstance) {
           tokenPath: '/token',
         },
       },
-      startRedirectPath: '/api/v1/auth/google',
-      callbackUri: config.OAUTH_REDIRECT_URI || 'http://localhost:3001/api/v1/auth/google/callback',
+      startRedirectPath: '/auth/google',
+      callbackUri: config.OAUTH_REDIRECT_URI || `http://localhost:${config.PORT}/api/v1/auth/google/callback`,
     });
 
     // Google OAuth callback
