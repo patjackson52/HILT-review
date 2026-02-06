@@ -155,7 +155,7 @@ function GenerateApiKeyModalWrapper({
 
   const handleGenerate = useCallback(
     async (params: { environment: 'live' | 'test'; name?: string }) => {
-      const result = await generateKey(params);
+      const result = await generateKey({ ...params, key_type: 'source' });
       onKeyGenerated(result.key);
       return result;
     },
