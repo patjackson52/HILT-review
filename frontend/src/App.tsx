@@ -5,6 +5,7 @@ import Layout from './pages/Layout';
 import Login from './pages/Login';
 import ReviewQueue from './pages/ReviewQueue';
 import ReviewTask from './pages/ReviewTask';
+import IntegrationSetup from './pages/IntegrationSetup';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         >
           <Route index element={<ReviewQueue />} />
           <Route path="tasks/:id" element={<ReviewTask />} />
+          <Route path="integrations" element={<IntegrationSetup />} />
         </Route>
       </Routes>
     </AuthProvider>

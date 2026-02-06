@@ -13,6 +13,7 @@ export default function Layout() {
         </Link>
         <nav className={styles.nav}>
           <Link to="/" className={styles.navLink}>Queue</Link>
+          <Link to="/integrations" className={styles.navLink}>Integrations</Link>
         </nav>
         <div className={styles.userMenu}>
           {user && (
