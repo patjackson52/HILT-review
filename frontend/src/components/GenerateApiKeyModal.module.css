@@ -1,0 +1,67 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.hint {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.error {
+  color: var(--color-danger);
+  font-size: 0.875rem;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: var(--radius);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.keyDisplay {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.warning {
+  padding: 0.75rem 1rem;
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.warning strong {
+  color: rgb(202, 138, 4);
+}
+
+.keyMeta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.acknowledge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0.5rem 0;
+}
+
+.acknowledge input {
+  width: 1rem;
+  height: 1rem;
+}

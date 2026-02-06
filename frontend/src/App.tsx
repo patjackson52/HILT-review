@@ -5,6 +5,7 @@ import Layout from './pages/Layout';
 import Login from './pages/Login';
 import ReviewQueue from './pages/ReviewQueue';
 import ReviewTask from './pages/ReviewTask';
+import IntegrationSetup from './pages/IntegrationSetup';
 import Archive from './pages/Archive';
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
         >
           <Route index element={<ReviewQueue />} />
           <Route path="tasks/:id" element={<ReviewTask />} />
+          <Route path="integrations" element={<IntegrationSetup />} />
           <Route path="archive" element={<Archive />} />
         </Route>
       </Routes>

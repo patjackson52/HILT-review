@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import type { RiskLevel } from '@hilt-review/shared';
 import styles from './Badge.module.css';
 
-type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | RiskLevel;
+type BadgeVariant = 'default' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | RiskLevel;
 
 interface BadgeProps {
   children: ReactNode;
