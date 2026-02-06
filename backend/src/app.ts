@@ -46,6 +46,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Error handler
   app.setErrorHandler(errorHandler);
 
+  // Root route
+  app.get('/', async () => {
+    return { service: 'hilt-review-api', status: 'ok', timestamp: new Date().toISOString() };
+  });
+
   // Health check endpoint
   app.get('/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };
