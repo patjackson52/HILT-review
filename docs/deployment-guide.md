@@ -216,8 +216,11 @@ Render auto-deploys on git push.
 Add environment variables:
 
 ```bash
-VITE_API_URL=https://api.your-domain.com
+# Required: URL of the Render backend (used by vercel.json rewrites to proxy /api/* requests)
+BACKEND_URL=https://your-render-app.onrender.com
 ```
+
+The `vercel.json` at the repo root rewrites `/api/*` requests to `$BACKEND_URL/api/*`, keeping all traffic same-origin. This is required for session cookies to work correctly.
 
 ### 4.3 Build Settings
 
@@ -271,11 +274,11 @@ NODE_ENV=production
 CORS_ORIGIN=https://hilt-review.com
 ```
 
-### Frontend (.env.local)
+### Frontend (Vercel Environment Variables)
 
 ```bash
-VITE_API_URL=https://api.hilt-review.com
-VITE_GOOGLE_CLIENT_ID=123456789.apps.googleusercontent.com
+# Required: Render backend URL for API proxy rewrites (used by vercel.json)
+BACKEND_URL=https://api.hilt-review.com
 ```
 
 ### Generate Secrets
