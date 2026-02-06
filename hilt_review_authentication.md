@@ -28,7 +28,7 @@ Human reviewers authenticate using **Google OAuth 2.0** with OpenID Connect (OID
 |---------|-------------|---------|
 | `GOOGLE_CLIENT_ID` | OAuth client ID from Google Cloud Console | `123456789.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | OAuth client secret | `GOCSPX-...` |
-| `OAUTH_REDIRECT_URI` | Callback URL after Google auth | `https://hilt-review.example.com/auth/callback` |
+| `OAUTH_REDIRECT_URI` | Callback URL after Google auth | `https://api.hilt-review.example.com/api/v1/auth/google/callback` |
 | `ALLOWED_DOMAINS` | Optional: restrict to specific Google Workspace domains | `["acme.com", "acme.io"]` |
 | `ALLOWED_EMAILS` | Optional: explicit allowlist of email addresses | `["admin@acme.com"]` |
 
@@ -273,7 +273,7 @@ Post-MVP, consider adding:
 # Google OAuth
 GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-your-secret
-OAUTH_REDIRECT_URI=https://hilt-review.example.com/auth/callback
+OAUTH_REDIRECT_URI=https://api.hilt-review.example.com/api/v1/auth/google/callback
 
 # Domain restriction (JSON array or comma-separated)
 ALLOWED_DOMAINS=["yourcompany.com"]
@@ -292,9 +292,10 @@ API_KEY_ENCRYPTION_KEY=<32-byte-random-hex>
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/auth/login` | GET | None | Redirect to Google OAuth |
-| `/auth/callback` | GET | None | OAuth callback handler |
-| `/auth/logout` | POST | Session | Invalidate session |
-| `/auth/me` | GET | Session | Get current user info |
+| `/api/v1/auth/google` | GET | None | Redirect to Google OAuth |
+| `/api/v1/auth/google/callback` | GET | None | OAuth callback handler |
+| `/api/v1/auth/logout` | POST | Session | Invalidate session |
+| `/api/v1/auth/me` | GET | Session | Get current user info |
+| `/api/v1/auth/status` | GET | None | Check if OAuth is configured |
 | `/api-keys` | GET/POST | Admin | List/create API keys |
 | `/api-keys/{id}` | DELETE | Admin | Revoke API key |

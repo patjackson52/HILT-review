@@ -99,8 +99,8 @@ DATABASE_URL=postgresql://user:password@ep-xxx.aws.neon.tech/hilt_review?sslmode
 3. Application type: **Web application**
 4. Add authorized redirect URIs:
    ```
-   http://localhost:3000/auth/callback          (development)
-   https://api.your-domain.com/auth/callback    (production)
+   http://localhost:3000/api/v1/auth/google/callback          (development)
+   https://api.your-domain.com/api/v1/auth/google/callback    (production)
    ```
 5. Copy **Client ID** and **Client Secret**
 
@@ -109,7 +109,7 @@ DATABASE_URL=postgresql://user:password@ep-xxx.aws.neon.tech/hilt_review?sslmode
 ```bash
 GOOGLE_CLIENT_ID=123456789.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxx
-OAUTH_REDIRECT_URI=https://api.your-domain.com/auth/callback
+OAUTH_REDIRECT_URI=https://api.your-domain.com/api/v1/auth/google/callback
 
 # Optional: Restrict to specific domains
 ALLOWED_DOMAINS=["yourcompany.com"]
@@ -139,7 +139,7 @@ DATABASE_URL=postgresql://...@neon.tech/hilt_review?sslmode=require
 # Google OAuth
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
-OAUTH_REDIRECT_URI=https://your-app.railway.app/auth/callback
+OAUTH_REDIRECT_URI=https://your-app.railway.app/api/v1/auth/google/callback
 
 # Session
 SESSION_SECRET=<generate-64-byte-hex>
@@ -216,17 +216,16 @@ Render auto-deploys on git push.
 Add environment variables:
 
 ```bash
-NEXT_PUBLIC_API_URL=https://api.your-domain.com
-NEXT_PUBLIC_GOOGLE_CLIENT_ID=123456789.apps.googleusercontent.com
+VITE_API_URL=https://api.your-domain.com
 ```
 
 ### 4.3 Build Settings
 
 | Setting | Value |
 |---------|-------|
-| Framework | Next.js (or Create React App) |
+| Framework | Vite |
 | Build Command | `npm run build` |
-| Output Directory | `.next` (or `build`) |
+| Output Directory | `dist` |
 
 ### 4.4 Deploy
 
@@ -258,7 +257,7 @@ DATABASE_URL=postgresql://user:pass@ep-xxx.neon.tech/hilt_review?sslmode=require
 # Google OAuth
 GOOGLE_CLIENT_ID=123456789.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxx
-OAUTH_REDIRECT_URI=https://api.hilt-review.com/auth/callback
+OAUTH_REDIRECT_URI=https://api.hilt-review.com/api/v1/auth/google/callback
 
 # Session
 SESSION_SECRET=64-random-hex-characters-here-generate-with-openssl-rand

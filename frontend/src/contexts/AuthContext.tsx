@@ -17,6 +17,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 // Development mode: auto-login with mock user when backend allows it
 const DEV_MODE = import.meta.env.DEV;
 const MOCK_USER: User = {
@@ -37,14 +39,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function checkAuth() {
     try {
       // Check auth status first
-      const statusResponse = await fetch('/api/v1/auth/status');
+      const statusResponse = await fetch(`${API_BASE}/api/v1/auth/status`);
       if (statusResponse.ok) {
         const status = await statusResponse.json();
         setIsOAuthEnabled(status.oauth_enabled);
       }
 
       // Try to get current user
-      const response = await fetch('/api/v1/auth/me', {
+      const response = await fetch(`${API_BASE}/api/v1/auth/me`, {
         credentials: 'include',
       });
 
@@ -72,12 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     // Redirect to OAuth login
-    window.location.href = '/api/v1/auth/google';
+    window.location.href = `${API_BASE}/api/v1/auth/google`;
   }
 
   async function logout() {
     try {
-      await fetch('/api/v1/auth/logout', {
+      await fetch(`${API_BASE}/api/v1/auth/logout`, {
         method: 'POST',
         credentials: 'include',
       });
