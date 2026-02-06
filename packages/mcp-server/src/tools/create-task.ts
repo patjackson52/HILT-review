@@ -1,3 +1,4 @@
+import type { ArtifactBlock, BlockType } from '@hilt-review/shared';
 import { HiltApiClient } from '../api-client.js';
 
 const inputSchema = {
@@ -101,9 +102,9 @@ export function createTaskTool(client: HiltApiClient, sourceId: string) {
           action: { type: 'create', verb: input.summary.slice(0, 50) },
           risk_level: input.risk_level || 'medium',
           priority: input.priority || 'NORMAL',
-          blocks: input.blocks.map((b, i) => ({
+          blocks: input.blocks.map((b, i): ArtifactBlock => ({
             id: `block-${i}`,
-            type: b.type,
+            type: b.type as BlockType,
             content: b.type === 'json' ? tryParseJson(b.content) : b.content,
             editable: b.editable ?? true,
           })),
@@ -124,9 +125,9 @@ export function createTaskTool(client: HiltApiClient, sourceId: string) {
   };
 }
 
-function tryParseJson(s: string): unknown {
+function tryParseJson(s: string): string | Record<string, unknown> {
   try {
-    return JSON.parse(s);
+    return JSON.parse(s) as Record<string, unknown>;
   } catch {
     return s;
   }
