@@ -2,19 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { userService, GoogleUserInfo } from '../services/user.service.js';
 import { config } from '../config/index.js';
 import { UnauthorizedError } from '../domain/errors.js';
-
-// Extend session type
-declare module '@fastify/session' {
-  interface FastifySessionObject {
-    userId?: string;
-    user?: {
-      id: string;
-      email: string;
-      name: string | null;
-      picture: string | null;
-    };
-  }
-}
+import { createAuthToken, verifyAuthToken } from '../utils/auth-token.js';
 
 export async function authRoutes(app: FastifyInstance) {
   // Check if OAuth is configured
@@ -45,12 +33,12 @@ export async function authRoutes(app: FastifyInstance) {
     app.get('/auth/google/callback', async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         // Get access token from OAuth2
-        const { token } = await (app as any).googleOAuth2.getAccessTokenFromAuthorizationCodeFlow(request);
+        const { token: oauthToken } = await (app as any).googleOAuth2.getAccessTokenFromAuthorizationCodeFlow(request);
 
         // Fetch user info from Google
         const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
           headers: {
-            Authorization: `Bearer ${token.access_token}`,
+            Authorization: `Bearer ${oauthToken.access_token}`,
           },
         });
 
@@ -71,17 +59,10 @@ export async function authRoutes(app: FastifyInstance) {
         // Find or create user
         const user = await userService.findOrCreateFromGoogle(googleUser);
 
-        // Set session
-        request.session.userId = user.id;
-        request.session.user = {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          picture: user.pictureUrl,
-        };
-
-        // Redirect to frontend
-        return reply.redirect(getFrontendUrl());
+        // Create auth token and redirect to frontend with it
+        const authToken = createAuthToken(user);
+        const frontendUrl = getFrontendUrl();
+        return reply.redirect(`${frontendUrl}/?token=${encodeURIComponent(authToken)}`);
       } catch (error) {
         request.log.error(error, 'OAuth callback error');
         return reply.redirect(`${getFrontendUrl()}/login?error=oauth_failed`);
@@ -101,30 +82,30 @@ export async function authRoutes(app: FastifyInstance) {
 
   // Get current user
   app.get('/auth/me', async (request: FastifyRequest, reply: FastifyReply) => {
-    if (!request.session.userId) {
+    // Check for Bearer token in Authorization header
+    const authHeader = request.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
       throw new UnauthorizedError('Not authenticated');
     }
 
-    const user = await userService.getById(request.session.userId);
-    if (!user) {
-      // Session references a deleted user
-      request.session.destroy();
+    const token = authHeader.slice(7);
+    const payload = verifyAuthToken(token);
+    if (!payload) {
       throw new UnauthorizedError('Not authenticated');
     }
 
     return {
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        picture: user.pictureUrl,
+        id: payload.userId,
+        email: payload.email,
+        name: payload.name,
+        picture: payload.picture,
       },
     };
   });
 
-  // Logout
+  // Logout (token-based auth - frontend clears localStorage)
   app.post('/auth/logout', async (request: FastifyRequest, reply: FastifyReply) => {
-    request.session.destroy();
     return reply.status(204).send();
   });
 

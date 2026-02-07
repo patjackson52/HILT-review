@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { apiKeyService, ApiKeyInfo } from '../services/api-key.service.js';
 import { UnauthorizedError, ForbiddenError } from '../domain/errors.js';
 import { config } from '../config/index.js';
+import { verifyAuthToken } from '../utils/auth-token.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -11,36 +12,56 @@ declare module 'fastify' {
 }
 
 /**
- * Middleware that requires a valid session (user login).
+ * Extract user ID from Bearer auth token.
+ */
+function getUserIdFromToken(request: FastifyRequest): string | null {
+  const authHeader = request.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) return null;
+
+  const token = authHeader.slice(7);
+  // Skip API keys (they start with hilt_)
+  if (token.startsWith('hilt_')) return null;
+
+  const payload = verifyAuthToken(token);
+  return payload?.userId ?? null;
+}
+
+/**
+ * Middleware that requires a valid auth token (user login).
  * In development and test modes, allows unauthenticated access for easier testing.
  */
 export async function requireSession(
   request: FastifyRequest,
   _reply: FastifyReply
 ): Promise<void> {
+  const userId = getUserIdFromToken(request);
+
+  if (userId) {
+    request.userId = userId;
+    return;
+  }
+
   // In development or test mode, allow unauthenticated access
-  if ((config.NODE_ENV === 'development' || config.NODE_ENV === 'test') && !request.session?.userId) {
+  if (config.NODE_ENV === 'development' || config.NODE_ENV === 'test') {
     request.userId = 'dev-user';
     return;
   }
 
-  if (!request.session?.userId) {
-    throw new UnauthorizedError('Authentication required. Please log in.');
-  }
-
-  request.userId = request.session.userId;
+  throw new UnauthorizedError('Authentication required. Please log in.');
 }
 
 /**
- * Middleware that optionally extracts user from session.
+ * Middleware that optionally extracts user from auth token.
  * Does not require authentication but provides user info if available.
  */
 export async function optionalSession(
   request: FastifyRequest,
   _reply: FastifyReply
 ): Promise<void> {
-  if (request.session?.userId) {
-    request.userId = request.session.userId;
+  const userId = getUserIdFromToken(request);
+
+  if (userId) {
+    request.userId = userId;
   } else if (config.NODE_ENV === 'development' || config.NODE_ENV === 'test') {
     request.userId = 'dev-user';
   }

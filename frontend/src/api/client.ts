@@ -8,6 +8,8 @@ import type {
   DeliveryMode,
 } from '@hilt-review/shared';
 
+import { getAuthToken } from '../contexts/AuthContext';
+
 const API_BASE = '/api/v1';
 
 class ApiError extends Error {
@@ -25,10 +27,18 @@ async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
+  const authToken = getAuthToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
+
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...headers,
       ...options.headers,
     },
   });

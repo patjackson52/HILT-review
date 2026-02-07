@@ -17,6 +17,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const AUTH_TOKEN_KEY = 'hilt_auth_token';
+
 // Development mode: auto-login with mock user when backend allows it
 const DEV_MODE = import.meta.env.DEV;
 const MOCK_USER: User = {
@@ -25,12 +27,25 @@ const MOCK_USER: User = {
   name: 'Developer',
 };
 
+export function getAuthToken(): string | null {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isOAuthEnabled, setIsOAuthEnabled] = useState(false);
 
   useEffect(() => {
+    // Check for token in URL (from OAuth redirect)
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token) {
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+      // Clean the token from the URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
     checkAuth();
   }, []);
 
@@ -43,17 +58,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsOAuthEnabled(status.oauth_enabled);
       }
 
-      // Try to get current user
-      const response = await fetch('/api/v1/auth/me', {
-        credentials: 'include',
-      });
+      // Try to get current user using stored token
+      const authToken = getAuthToken();
+      if (!authToken && !DEV_MODE) {
+        return;
+      }
+
+      const headers: Record<string, string> = {};
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+
+      const response = await fetch('/api/v1/auth/me', { headers });
 
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
-      } else if (DEV_MODE) {
-        // In dev mode, if not authenticated, use mock user
-        setUser(MOCK_USER);
+      } else {
+        // Token is invalid or expired - clear it
+        localStorage.removeItem(AUTH_TOKEN_KEY);
+        if (DEV_MODE) {
+          setUser(MOCK_USER);
+        }
       }
     } catch {
       // Not authenticated - in dev mode, use mock user
@@ -77,13 +103,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function logout() {
     try {
-      await fetch('/api/v1/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
+      const authToken = getAuthToken();
+      const headers: Record<string, string> = {};
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+      }
+      await fetch('/api/v1/auth/logout', { method: 'POST', headers });
     } catch {
       // Ignore logout errors
     } finally {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
       setUser(null);
       if (!DEV_MODE) {
         window.location.href = '/login';
